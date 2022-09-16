@@ -1,19 +1,21 @@
+
+
 use std::alloc;
 use std::alloc::{Layout};
-use std::collections::HashMap;
 use std::ffi::c_void;
-use std::fs::read;
-use std::mem::size_of;
-use std::ptr::NonNull;
+use std::mem::{size_of};
 
 #[inline]
 pub fn allocate(size:usize)->* mut c_void{
     unsafe{
-        let mut allocated =
-            alloc::alloc(Layout::from_size_align(size+size_of::<usize>(),size_of::<usize>()).unwrap())
-                             .cast::<usize>();
-        *(allocated as *mut usize) = size;
-        return allocated.add(1).cast();
+        let allocated = alloc::alloc(
+                Layout::from_size_align(
+                    size+size_of::<usize>(),
+                    size_of::<usize>()
+                ).unwrap()
+            ).cast::<usize>();
+        *(allocated as *mut usize) = size+size_of::<usize>();
+        allocated.add(1).cast()
     }
 }
 #[inline]
@@ -23,31 +25,24 @@ pub fn deallocate(ptr:*mut c_void){
         alloc::dealloc(
                 allocated.cast(),
                 Layout::from_size_align(
-                    *allocated+size_of::<usize>(),
+                    *allocated,
                     size_of::<usize>()
                 ).unwrap()
             );
     }
 }
 
-
 pub mod data_structure{
     pub mod double_ll{
         use std::alloc::{alloc, Layout};
-        use std::collections::LinkedList;
-        use std::fmt::{Debug, Display, Formatter};
-        use std::os::unix::net::UnixDatagram;
-        use std::ptr::{null, null_mut};
-        use crate::util::{allocate, deallocate};
+        use std::fmt::{Debug, Formatter};
+        use std::ptr::null_mut;
 
-        pub trait Node<TAG,T:?Sized>:AsRef<T>{
-            #[inline]
-            fn next(&mut self)->&mut *mut (dyn Node<TAG,T>+AsRef<T>);
-            #[inline]
-            fn prev(&mut self)->&mut *mut (dyn Node<TAG,T>+AsRef<T>);
+        pub trait Node<TAG:'static,T:?Sized+'static>:AsRef<T>+'static{
+            fn next(&mut self)->&mut *mut (dyn Node<TAG,T>+'static);
+            fn prev(&mut self)->&mut *mut (dyn Node<TAG,T>+'static);
         }
         pub trait NodeExt{
-            #[inline]
             fn remove(&mut self);
         }
         // impl <TAG,T:Node<TAG>> NodeExt for T {
@@ -57,36 +52,39 @@ pub mod data_structure{
         //         self.next().prev() = self.prev();
         //     }
         // }
-        pub struct List<TAG,T:?Sized>{
+        pub struct List<TAG:'static,T:?Sized+'static>{
             head:*mut dyn Node<TAG,T>,
             rear:*mut dyn Node<TAG,T>,
         }
-        impl<TAG,T> Drop for List<TAG,T>{
+        impl<TAG:'static,T:?Sized+'static> Drop for List<TAG,T>{
             fn drop(&mut self) {
-                deallocate(self.head.cast());
+                unsafe{
+                    std::alloc::dealloc(self.head.cast(),Layout::new::<[HeadPlaceholderNode<TAG,T>; 2]>());
+                }
             }
         }
-        struct HeadPlaceholderNode<TAG,T>{
+        struct HeadPlaceholderNode<TAG,T:?Sized+'static>{
             next :*mut dyn Node<TAG,T>,
             prev :*mut dyn Node<TAG,T>,
         }
         //此处的AsRef是不安全的。是为了满足TraitBound
-        impl<TAG,T:?Sized> AsRef<T> for HeadPlaceholderNode<TAG,T>{
+        impl<TAG:'static,T:?Sized+'static> AsRef<T> for HeadPlaceholderNode<TAG,T>{
             fn as_ref(&self) -> &T {
                 unsafe {
-                    return (*Self.next).as_ref();
+                    return (*self.next).as_ref();
                 }
             }
         }
-        impl<TAG,T:?Sized> Node<TAG,T> for HeadPlaceholderNode<TAG,T>{
-            fn next(&mut self) -> &mut *mut dyn Node<TAG,T> {
-                return &mut self.next
+        impl<TAG:'static,T:?Sized+'static> Node<TAG,T> for HeadPlaceholderNode<TAG,T>{
+            fn next(&mut self) -> &mut *mut (dyn Node<TAG,T>+'static) {
+                &mut self.next
             }
-            fn prev(&mut self) -> &mut *mut dyn Node<TAG,T> {
+            fn prev(&mut self) -> &mut *mut (dyn Node<TAG,T>+'static) {
                 &mut self.prev
             }
         }
-        impl<TAG,T:?Sized> List<TAG,T>{
+
+        impl<TAG:'static,T:?Sized+'static> List<TAG,T>{
             pub fn new()->Self {
                 unsafe{
                     let help_nodes = alloc(Layout::new::<[HeadPlaceholderNode<TAG,T>; 2]>())
@@ -102,25 +100,28 @@ pub mod data_structure{
                     }
                 }
             }
+
             pub fn insert_front<U:Node<TAG,T>>(&self, node:*mut U){
                 unsafe{
-                    let mut head = self.head;
+                    let head = self.head;
                     *(**(*head).next()).prev() = node;
                     *(*head).next() = node;
                     *(*node).next() = *(*head).next();
                     *(*node).prev() = head;
                 }
             }
+
             pub fn insert_back<U:Node<TAG,T>>(&self,node:*mut U){
                 unsafe{
-                    let mut rear = self.rear;
+                    let rear = self.rear;
                     *(**(*rear).prev()).next() = node;
                     *(*rear).prev() = node;
                     *(*node).next() = rear;
                     *(*node).prev() = *(*rear).prev();
                 }
             }
-            pub fn concat_front(&self,other:&mut Self){
+
+            pub fn concat_front(&self,other:&Self){
                 unsafe {
                     //remove the nodes from other list
                     let other_list_first = *(*other.head).next();
@@ -135,6 +136,7 @@ pub mod data_structure{
                     *(*self.head).next() = other_list_first;
                 }
             }
+
             pub fn concat_back(&self,other:&mut Self){
                 unsafe{
                     //remove the nodes from other list
@@ -152,7 +154,7 @@ pub mod data_structure{
             }
             pub fn empty(&self)->bool{
                 unsafe{
-                    let mut ptr = self.head;
+                    let ptr = self.head;
                     (*(*ptr).next()).is_null()
                 }
             }
@@ -173,12 +175,12 @@ pub mod data_structure{
                 }
             }
             impl Test{
-                pub fn new(value:usize)->Self{
-                    Self{
-                        prev_1: Default::default(),
-                        next_1: Default::default(),
-                        prev_2: Default::default(),
-                        next_2: Default::default(),
+                pub fn new(value:usize)->Self {
+                    Self {
+                        prev_1: null_mut::<Self>() as *mut dyn Node<Tag1, dyn Debug>,
+                        next_1: null_mut::<Self>() as *mut dyn Node<Tag1, dyn Debug>,
+                        prev_2: null_mut::<Self>() as *mut dyn Node<Tag2, dyn Debug>,
+                        next_2: null_mut::<Self>() as *mut dyn Node<Tag2, dyn Debug>,
                         value,
                     }
                 }
@@ -186,39 +188,45 @@ pub mod data_structure{
             pub struct Tag1();
             pub struct Tag2();
             impl AsRef<dyn Debug> for Test {
-                fn as_ref(&self) -> &dyn Debug {
+                fn as_ref(&self) -> & (dyn Debug+'static) {
                     return self;
                 }
             }
             impl Node<Tag1,dyn Debug> for Test{
-                fn next(&mut self) -> &mut *mut dyn Node<Tag1,dyn Debug> {
+                fn next(&mut self) -> &mut *mut (dyn Node<Tag1,dyn Debug>+'static) {
                     return &mut self.next_1;
                 }
 
-                fn prev(&mut self) -> &mut *mut dyn Node<Tag1,dyn Debug> {
+                fn prev(&mut self) -> &mut *mut (dyn Node<Tag1,dyn Debug>+'static) {
                     return &mut self.prev_1;
                 }
             }
             impl Node<Tag2, dyn Debug> for Test{
-                fn next(&mut self) -> &mut *mut dyn Node<Tag2,dyn Debug> {
+                fn next(&mut self) -> &mut *mut (dyn Node<Tag2,dyn Debug>+'static) {
                     return &mut self.next_2;
                 }
 
-                fn prev(&mut self) -> &mut *mut dyn Node<Tag2,dyn Debug> {
+                fn prev(&mut self) -> &mut *mut (dyn Node<Tag2,dyn Debug>+'static) {
                     return &mut self.prev_2;
                 }
             }
             let mut test1 = Test::new(1);
             let mut test2 = Test::new(2);
             let mut test3 = Test::new(3);
-            let mut test_list_1 = List::<Tag1,dyn Debug>::new();
-            let mut test_list_2 = List::<Tag2,dyn Debug>::new();
+            let test_list_1 = List::<Tag1,dyn Debug>::new();
+            let test_list_2 = List::<Tag2,dyn Debug>::new();
+            test_list_1.insert_back(&mut test3 as *mut Test);
             test_list_1.insert_back(&mut test1 as *mut Test);
-            test_list_2.insert_back(&mut test1 as *mut Test);
             test_list_1.insert_back(&mut test2 as *mut Test);
+            test_list_2.insert_back(&mut test1 as *mut Test);
             test_list_2.insert_back(&mut test2);
-
-
+            unsafe{
+                let mut ptr = *(*test_list_1.head).next();
+                while !(*ptr).next().is_null(){
+                    println!("{:?}",(*ptr).as_ref());
+                    ptr = *(*ptr).next();
+                }
+            }
         }
     }
 

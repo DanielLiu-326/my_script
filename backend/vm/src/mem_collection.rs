@@ -1,14 +1,12 @@
-use std::borrow::Borrow;
-use std::collections::HashMap;
-use std::ffi::c_void;
-use std::mem::swap;
-use std::os::linux::raw::stat;
-use std::os::unix::fs::chroot;
-use std::ptr::{null, null_mut};
-use super::util;
-use util::data_structure::double_ll::List as DoubleRawList;
-use util::data_structure::double_ll::NodeExt;
-use crate::util::data_structure::double_ll::{List, Node};
+// use std::borrow::Borrow;
+// use std::collections::HashMap;
+// use std::ffi::c_void;
+// use std::mem::swap;
+// use std::ptr::{null, null_mut};
+// use super::util;
+// use util::data_structure::double_ll::List as DoubleRawList;
+// use util::data_structure::double_ll::NodeExt;
+// use crate::util::data_structure::double_ll::{List, Node};
 
 //root                  //child change, self deleted, become not root
 //unstable              //child change，self deleted，become root
@@ -225,16 +223,5 @@ use crate::util::data_structure::double_ll::{List, Node};
 #[test]
 fn test() {
 
-
-}
-
-pub trait GcListNode{
-    fn prev()->*mut dyn GcListNode;
-    fn next()->*mut dyn GcListNode;
-}
-pub trait GcListNodeExt{
-
-}
-pub trait GcObject:GcListNode+Drop {
 
 }
