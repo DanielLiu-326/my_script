@@ -1,4 +1,4 @@
-pub enum OpCode{
+pub enum OpCode {
     NewBool(),
     NewFloat(),
     NewNil(),
@@ -15,7 +15,4 @@ pub enum OpCode{
     Ne(),
     Eq(),
     RefEq(),
-
-
-
 }

@@ -51,8 +51,6 @@
 //      }
 // }
 
-
-
 // pub struct RcObject<T:?Sized>{
 //     count:usize,
 //     body:T,
@@ -221,7 +219,4 @@
 // }
 
 #[test]
-fn test() {
-
-
-}
+fn test() {}
