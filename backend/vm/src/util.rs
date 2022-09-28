@@ -30,50 +30,55 @@ pub mod data_structure {
     pub mod ptr{
         use std::ops::{Deref, DerefMut};
         ///
-        /// DynPtr:
-        /// 胖指针，相对于primitive类型增加了null值，对null值解引用将出错
+        /// 指针类型，指向普通类型时大小为usize大小，指向非Thin类型时，大小根据为usize+std::ptr::Metadata大小
+        /// 支持了dyn类型的null值，对null值解引用是未定义的行为
         ///
-        pub struct DynPtr<Dyn: ?Sized> {
+        pub struct Ptr<Dyn: ?Sized> {
             ptr: *const (),
             meta: <Dyn as std::ptr::Pointee>::Metadata,
         }
 
-        impl<Dyn:?Sized> Clone for DynPtr<Dyn> {
+        impl<Dyn:?Sized> Clone for Ptr<Dyn> {
             fn clone(&self) -> Self {
                 *self
             }
         }
-        impl<Dyn:?Sized> Copy for DynPtr<Dyn> {}
+        impl<Dyn:?Sized> Copy for Ptr<Dyn> {}
 
-        impl<Dyn: ?Sized> DynPtr<Dyn> {
-            fn new(ptr: &Dyn) -> Self {
+        impl<Dyn: ?Sized> Ptr<Dyn> {
+            pub fn new(ptr: &Dyn) -> Self {
                 Self {
                     ptr: (ptr as *const Dyn).cast(),
                     meta: std::ptr::metadata(ptr as *const Dyn),
                 }
             }
-            fn null() -> Self {
+            pub fn null() -> Self {
                 Self {
                     ptr: std::ptr::null(),
                     meta: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
                 }
             }
-            fn is_null(&self) -> bool {
+            pub fn is_null(&self) -> bool {
                 self.ptr.is_null()
             }
-            fn thin(&self) -> *const () {
+            pub fn thin(&self) -> *const () {
                 return self.ptr;
             }
-            fn metadata(&self) -> <Dyn as std::ptr::Pointee>::Metadata {
+            pub fn metadata(&self) -> <Dyn as std::ptr::Pointee>::Metadata {
                 self.meta
             }
         }
-        impl<Dyn: ?Sized> From<&Dyn> for DynPtr<Dyn> {
-            fn from(f: &Dyn) -> Self {
-                DynPtr::new(f)
+        impl<Dyn:?Sized> Into<*const Dyn> for Ptr<Dyn> {
+            fn into(self) -> *const Dyn {
+                std::ptr::from_raw_parts(self.ptr,self.meta)
             }
         }
-        impl<Dyn: ?Sized> Deref for DynPtr<Dyn> {
+        impl<Dyn: ?Sized> From<&Dyn> for Ptr<Dyn> {
+            fn from(f: &Dyn) -> Self {
+                Ptr::new(f)
+            }
+        }
+        impl<Dyn: ?Sized> Deref for Ptr<Dyn> {
             type Target = Dyn;
 
             fn deref(&self) -> &Self::Target {
@@ -86,20 +91,20 @@ pub mod data_structure {
         /// DynPtrMut:
         /// 可变胖指针，相对于primitive类型增加了null值，对null值解引用将出错
         ///
-        pub struct DynPtrMut<Dyn: ?Sized> {
+        pub struct PtrMut<Dyn: ?Sized> {
             ptr: *mut (),
             meta: <Dyn as std::ptr::Pointee>::Metadata,
         }
 
-        impl<Dyn:?Sized> Clone for DynPtrMut<Dyn> {
+        impl<Dyn:?Sized> Clone for PtrMut<Dyn> {
             fn clone(&self) -> Self {
                 *self
             }
         }
 
-        impl<Dyn:?Sized> Copy for DynPtrMut<Dyn> {}
+        impl<Dyn:?Sized> Copy for PtrMut<Dyn> {}
 
-        impl<Dyn: ?Sized> DynPtrMut<Dyn> {
+        impl<Dyn: ?Sized> PtrMut<Dyn> {
             pub fn new(ptr: &mut Dyn) -> Self {
                 Self {
                     ptr: (ptr as *mut Dyn).cast(),
@@ -122,12 +127,24 @@ pub mod data_structure {
                 self.meta
             }
         }
-        impl<Dyn: ?Sized+'static> From<&mut Dyn> for DynPtrMut<Dyn> {
-            fn from(f: &mut Dyn) -> Self {
-                DynPtrMut::new(f)
+
+        impl<Dyn:?Sized> Into<*mut Dyn> for PtrMut<Dyn> {
+            fn into(self) -> *mut Dyn {
+                std::ptr::from_raw_parts_mut(self.ptr,self.meta)
             }
         }
-        impl<Dyn: ?Sized> Deref for DynPtrMut<Dyn> {
+        impl<Dyn:?Sized> Into<*const Dyn> for PtrMut<Dyn> {
+            fn into(self) -> *const Dyn {
+                std::ptr::from_raw_parts(self.ptr,self.meta)
+            }
+        }
+
+        impl<Dyn: ?Sized+'static> From<&mut Dyn> for PtrMut<Dyn> {
+            fn from(f: &mut Dyn) -> Self {
+                PtrMut::new(f)
+            }
+        }
+        impl<Dyn: ?Sized> Deref for PtrMut<Dyn> {
             type Target = Dyn;
 
             fn deref(&self) -> &Self::Target {
@@ -137,7 +154,7 @@ pub mod data_structure {
             }
         }
 
-        impl<Dyn: ?Sized> DerefMut for DynPtrMut<Dyn> {
+        impl<Dyn: ?Sized> DerefMut for PtrMut<Dyn> {
             fn deref_mut(&mut self) -> &mut Self::Target {
                 unsafe {
                     &mut *std::ptr::from_raw_parts_mut(self.ptr, self.meta)
@@ -152,9 +169,9 @@ pub mod data_structure {
         use std::cell::Cell;
         use std::fmt::{Debug, Formatter};
         use std::ops::{Deref, DerefMut};
-        use crate::util::data_structure::ptr::DynPtrMut;
+        use crate::util::data_structure::ptr::PtrMut;
 
-        pub type NodePtr<TAG,Trait:?Sized> = DynPtrMut<dyn NodeExt<TAG, Trait>>;
+        pub type NodePtr<TAG,Trait:?Sized> = PtrMut<dyn NodeExt<TAG, Trait>>;
 
         pub struct NodeExtraData<TAG,Trait:?Sized> {
             next:Cell<NodePtr<TAG,Trait>>,

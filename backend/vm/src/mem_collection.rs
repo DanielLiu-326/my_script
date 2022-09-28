@@ -2,12 +2,13 @@ use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::ffi::c_void;
 use std::mem::swap;
+use std::ops::{Deref, DerefMut};
 use std::ptr::{null, null_mut};
 use super::util;
 use util::data_structure::double_ll::List as DoubleRawList;
 use util::data_structure::double_ll::NodeExt;
 use crate::util::data_structure::double_ll::{List, Node, NodeExtraData, NodePtr};
-use crate::util::data_structure::ptr::{DynPtr, DynPtrMut};
+use crate::util::data_structure::ptr::{Ptr, PtrMut};
 
 // root                  //child change, self deleted, become not root
 // unstable              //child change，self deleted，become root
@@ -61,22 +62,63 @@ pub struct RcObject<T:?Sized> {
 }
 
 pub struct RcReference<B:?Sized>{
-    ptr:*mut RcObject<B>,
+    ptr:PtrMut<RcObject<B>>,
+}
+
+impl<B:?Sized> RcReference<B>{
+    pub fn inner(&self)->&PtrMut<RcObject<B>>{
+        &self.ptr
+    }
+    pub fn inner_mut(&mut self)->&mut PtrMut<RcObject<B>>{
+        &mut self.ptr
+    }
+    pub fn body(&self)->&B{
+        &self.ptr.deref().body
+    }
+    pub fn body_mut(&mut self) ->&mut B{
+        &mut self.ptr.deref_mut().body
+    }
+    pub fn count(&self)->usize{
+        self.ptr.count
+    }
+}
+impl <B:?Sized> Deref for RcReference<B>{
+    type Target = RcObject<B>;
+
+    fn deref(&self) -> &Self::Target {
+        self.ptr.deref()
+    }
+}
+impl <B:?Sized> DerefMut for RcReference<B>{
+
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.ptr.deref_mut()
+    }
+}
+
+impl<B:?Sized> Clone for RcReference<B>{
+    fn clone(&self) -> Self {
+        let mut ret =Self{
+            ptr:self.ptr
+        };
+        ret.deref_mut().count+=1;
+        ret
+    }
 }
 impl<B:?Sized> Drop for RcReference<B>{
     fn drop(&mut self) {
         unsafe{
-            if self.ptr.count==1{
-                self.ptr.drop_in_place();
-                util::deallocate(self.ptr.cast())
-            }else{
-                self.ptr.count-=1;
+            self.ptr.deref_mut().count -= 1;
+            if self.ptr.deref().count==0{
+                <PtrMut<RcObject<B>> as Into<*mut RcObject<B>>>::into(self.ptr).drop_in_place();
             }
         }
     }
 }
 
-type GcObject<T> = RcObject<GcData<T>>;
+
+
+/********************************************************************************/
 
 pub trait GcBody{
     fn is_child_scanning(&self)->bool;
@@ -84,6 +126,11 @@ pub trait GcBody{
     fn next_child(&mut self)->Option<GcReference<dyn GcBody>>;
     fn leave_gc_scan(&mut self);
 }
+
+
+type GcObject<T:?Sized+GcBody> = RcObject<GcData<T>>;
+
+
 #[derive(Copy,Clone)]
 pub enum GcStateType{
     Stable,
@@ -97,7 +144,7 @@ pub struct GcState{
 }
 impl GcState{
     fn gc_state(&self,ctx:&GcContext)->GcStateType{
-        if self.rounds!= ctx.round{
+        if self.round!= ctx.round{
             GcStateType::Unstable
         }else{
             self.state
@@ -114,7 +161,7 @@ struct GcData<T:?Sized+GcBody> {
 
     obj_state:GcState,
 
-    gc:DynPtrMut<GarbageCollector>,
+    gc:PtrMut<GarbageCollector>,
 
     gc_ll_data:NodeExtraData<GcLLTag,dyn GcBody>,
 
@@ -130,30 +177,23 @@ impl<T:?Sized+GcBody> GcData<T>{
 
 
 
-impl<B:?Sized> Clone for RcReference<B>{
-    fn clone(&self) -> Self {
-        self.ptr.count+=1;
-        Self{
-            ptr:self.ptr
-        }
-    }
-}
-
-
-pub struct GcReference<B:?Sized>{
+pub struct GcReference<B:?Sized+GcBody>{
     is_gc_root:bool,
-    rc_ptr:RcReference<GcInfo<B>>,
+    rc_ptr:RcReference<GcData<B>>,
 }
 
 
-impl<B:?Sized> Drop for GcReference<B>{
+impl<B:?Sized+GcBody> Drop for GcReference<B>{
     fn drop(&mut self) {
-
+        if self.is_gc_root{
+            self.rc_ptr.body_mut().gc_root_count-=1;
+        }
+        //todo remove from
     }
 }
 
 
-impl<T:?Sized> Clone for GcReference<T>{
+impl<T:?Sized+GcBody> Clone for GcReference<T>{
     fn clone(&self) -> Self {
         if self.is_gc_root{
             self.rc_ptr.ptr.body.gc_root_count+=1;
@@ -166,7 +206,7 @@ impl<T:?Sized> Clone for GcReference<T>{
 }
 
 
-impl<T:?Sized> GcReference<T>{
+impl<T:?Sized+GcBody> GcReference<T>{
     fn downgrade_clone(&self)->Self{
         Self{
             is_gc_root: false,
@@ -175,14 +215,15 @@ impl<T:?Sized> GcReference<T>{
     }
 
     fn upgrade_clone(&self)->Self{
-        self.rc_ptr.ptr.body.gc_root_count+=1;
-        if self.rc_ptr.ptr.body.gc_root_count == 1{
-            self.rc_ptr.ptr.body.gc.move_to(GcState::ROOT,self.rc_ptr.ptr);
-        }
-        Self{
-            is_gc_root: true,
-            rc_ptr: self.rc_ptr.clone(),
-        }
+        // self.rc_ptr.ptr.body.gc_root_count+=1;
+        // if self.rc_ptr.ptr.body.gc_root_count == 1{
+        //     self.rc_ptr.ptr.body.gc.move_to(GcState::ROOT,self.rc_ptr.ptr);
+        // }
+        // Self{
+        //     is_gc_root: true,
+        //     rc_ptr: self.rc_ptr.clone(),
+        // }
+        todo!()
     }
 }
 
@@ -194,7 +235,7 @@ pub struct GarbageCollector{
     stable_list:        List<GcLLTag,dyn GcBody>,
     //delete_list:        List<GcLLTag,dyn GcBody>,
 
-    context:            ScanContext,
+    context:            GcContext,
 }
 
 pub struct GcContext{
@@ -219,16 +260,17 @@ impl GarbageCollector{
             reachable_list: List::new(),
             stable_list:    List::new(),
             //delete_list:    List::new(),
-            context:ScanContext{
-                now: None
+            context:GcContext{
+                round: 0,
             }
         }
     }
     pub fn start_gc(&mut self){
-        if self.context.now.is_none(){
-            DoubleRawList::insert_front(&self.root_list,null_mut());
-
-        }
+        // if self.context.now.is_none(){
+        //     DoubleRawList::insert_front(&self.root_list,null_mut());
+        //
+        // }
+        todo!()
     }
     pub fn gc_step(&mut self,steps:isize){
 
