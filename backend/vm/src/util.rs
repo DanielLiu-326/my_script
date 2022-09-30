@@ -1,7 +1,9 @@
 use std::alloc;
 use std::alloc::Layout;
 use std::ffi::c_void;
+use std::fmt::{Debug, Formatter};
 use std::mem::size_of;
+use crate::util::data_structure::double_ll::{List, ListTag, Node, NodeExt, NodeExtraData, NodePtr};
 
 #[inline]
 pub fn allocate(size: usize) -> *mut c_void {
@@ -316,28 +318,33 @@ pub mod ptr{
 }
 pub mod data_structure {
     pub mod double_ll {
+        use core::panicking::panic;
         use std::alloc::{alloc, Layout};
         use std::borrow::{Borrow, BorrowMut};
         use std::cell::Cell;
         use std::fmt::{Debug, Formatter};
+        use std::io::Take;
         use std::ops::{Deref, DerefMut};
         use crate::util::ptr::PtrMut;
 
+        pub trait ListTag{
+            type Trait:?Sized;
+        }
 
         ///
         /// 节点的前向/后向指针类型
         ///
-        pub type NodePtr<TAG,Trait:?Sized> = PtrMut<dyn NodeExt<TAG, Trait>>;
+        pub type NodePtr<TAG:ListTag> = PtrMut<dyn NodeExt<TAG>>;
 
         ///
         /// 一个类型作为节点所需要的指针信息
         ///
-        pub struct NodeExtraData<TAG,Trait:?Sized> {
-            next:Cell<NodePtr<TAG,Trait>>,
-            prev:Cell<NodePtr<TAG,Trait>>,
+        pub struct NodeExtraData<TAG:ListTag> {
+            next:Cell<NodePtr<TAG>>,
+            prev:Cell<NodePtr<TAG>>,
         }
 
-        impl<TAG,Trait:?Sized> Default for NodeExtraData<TAG, Trait>{
+        impl<TAG:ListTag> Default for NodeExtraData<TAG>{
             fn default() -> Self {
                 Self{
                     next: Cell::new(NodePtr::null()),
@@ -346,21 +353,21 @@ pub mod data_structure {
             }
         }
 
-        impl<TAG,Trait:?Sized> NodeExtraData<TAG, Trait> {
+        impl<TAG:ListTag> NodeExtraData<TAG> {
             #[inline]
-            pub fn get_next(&self)->NodePtr<TAG,Trait>{
+            pub fn get_next(&self)->NodePtr<TAG>{
                 self.next.get()
             }
             #[inline]
-            pub fn set_next(&self,next:NodePtr<TAG,Trait>){
+            pub fn set_next(&self,next:NodePtr<TAG>){
                 self.next.set(next)
             }
             #[inline]
-            pub fn get_prev(&self)->NodePtr<TAG,Trait>{
+            pub fn get_prev(&self)->NodePtr<TAG>{
                 self.prev.get()
             }
             #[inline]
-            pub fn set_prev(&self,prev:NodePtr<TAG,Trait>){
+            pub fn set_prev(&self,prev:NodePtr<TAG>){
                 self.prev.set(prev)
             }
         }
@@ -373,13 +380,10 @@ pub mod data_structure {
         ///
         /// - TAG:同一个节点可以在不同的List中，节点要存储多个List的指针信息，用0大小的类型当作Tag来区分他们
         ///
-        ///
-        pub trait Node<TAG:Implemented>:AsRef<TAG::Trait> {
-            /// 对象所在的List都实现过的
-            /// Trait关联类型需要是一个dyn Trait，rust没有associated Trait 所以只能用dyn trait来代替，并通过
-            type Trait: ?Sized;
+
+        pub trait Node<TAG:ListTag>:BorrowMut<TAG::Trait> {
             /// 返回节点的附加信息
-            fn extra_data(&self)->&NodeExtraData<TAG,Self::Trait>;
+            fn extra_data(&self)->&NodeExtraData<TAG>;
         }
 
         ///
@@ -389,67 +393,138 @@ pub mod data_structure {
         /// - NodeExt将会为所有实现过BorrowMut<Trait>和Node的类型自动实现，不需要手动实现
         /// - NodeExt对外的作用是可以通过对象本身来从它所在的List中移除
         ///
-        pub trait NodeExt<TAG,Trait:?Sized> :Node<TAG,Trait=Trait>+BorrowMut<Trait>{
+        pub trait NodeExt<TAG:ListTag>{
+            fn remove(&self);
+            fn as_trait(&self)->&TAG::Trait;
+            fn as_trait_mut(&self)->&TAG::Trait;
+            fn get_next(&self)->NodePtr<TAG>;
+            fn set_next(&self,next:NodePtr<TAG>);
+            fn get_prev(&self)->NodePtr<TAG>;
+            fn set_prev(&self,prev:NodePtr<TAG>);
+        }
+
+        impl <TAG:ListTag,T> NodeExt<TAG> for T
+            where T:Node<TAG>, {
             fn remove(&self){
                 self.extra_data().set_next(
                     self.extra_data()
-                    .get_next()
-                    .deref()
-                    .extra_data()
-                    .get_next()
+                        .get_next()
+                        .deref()
+                        .extra_data()
+                        .get_next()
                 )
             }
-        }
-
-        impl <TAG,Trait:?Sized,T> NodeExt<TAG,Trait> for T
-            where T:Node<TAG,Trait=Trait>+BorrowMut<Trait>,
-        {}
-
-        struct HeadNode<TAG,Trait:?Sized>{
-            data:NodeExtraData<TAG,Trait>,
-        }
-
-        impl<TAG,Trait:?Sized> Node<TAG> for HeadNode<TAG,Trait>{
-            type Trait = Trait;
-
-            fn extra_data(&self) -> &NodeExtraData<TAG, Self::Trait> {
-                &self.data
+            fn as_trait(&self) -> &TAG::Trait {
+                return self.borrow()
+            }
+            fn as_trait_mut(&self) -> &TAG::Trait {
+                return self.borrow_mut()
+            }
+            fn get_next(&self) -> NodePtr<TAG> {
+                self.extra_data().get_next()
+            }
+            fn set_next(&self, next: NodePtr<TAG>) {
+                self.extra_data().set_next(next)
+            }
+            fn get_prev(&self) -> NodePtr<TAG> {
+                self.extra_data().get_prev()
+            }
+            fn set_prev(&self, prev: NodePtr<TAG>) {
+                self.extra_data().set_prev(prev)
             }
         }
-
-        impl<TAG, Trait: ?Sized> Borrow<Trait> for HeadNode<TAG, Trait> {
-            fn borrow(&self) -> &Trait {
-                panic!("calling Borrow<Trait>() on head node")
+        struct HeadNode<TAG:ListTag>{
+            data:NodeExtraData<TAG>,
+        }
+        impl<TAG:ListTag> NodeExt<TAG> for HeadNode<TAG>{
+            fn remove(&self) {
+                self.data.set_next(
+                    self.extra_data()
+                        .get_next()
+                        .deref()
+                        .extra_data()
+                        .get_next()
+                )
             }
-        }
-
-        impl<TAG, Trait: ?Sized> BorrowMut<Trait> for HeadNode<TAG, Trait> {
-            fn borrow_mut(&mut self) -> &mut Trait {
-                panic!("call BorrowMut<Trait>() on head node")
+            fn as_trait(&self) -> &TAG::Trait {
+                panic!("error:calling Borrow<TAG::Trait>::borrow on HeaderNode")
             }
+            fn as_trait_mut(&self) -> &TAG::Trait {
+                panic!("error:calling BorrowMut<TAG::Trait>::borrow_mut on HeaderNode")
+            }
+            fn get_next(&self) -> NodePtr<TAG> {
+                self.data.get_next()
+            }
+            fn set_next(&self, next: NodePtr<TAG>) {
+                self.data.set_next(next)
+            }
+            fn get_prev(&self) -> NodePtr<TAG> {
+                self.data.get_prev()
+            }
+            fn set_prev(&self, prev: NodePtr<TAG>) {
+                self.data.set_prev(prev)
+            }
+
         }
 
-        pub struct List<TAG,Trait:?Sized> {
-            head: NodePtr<TAG,Trait>,
-            rear: NodePtr<TAG,Trait>,
+        /// deprecated cuased by:
+        ///
+        /// error[E0119]: conflicting implementations of trait `std::borrow::BorrowMut<util::data_structure::double_ll::HeadNode<_>>` for type `util::data_structure::double_ll::HeadNode<_>`
+        ///    --> src\util.rs:414:9
+        ///     |
+        /// 414 |         impl<TAG: ListTag> BorrowMut<TAG::Trait> for HeadNode<TAG> {
+        ///     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        ///     |
+        ///     = note: conflicting implementation in crate `core`:
+        ///             - impl<T> BorrowMut<T> for T
+        ///               where T: ?Sized;
+        ///
+        /// reference: https://github.com/rust-lang/rust/issues/56804
+        /// wait for   https://github.com/rust-lang/rfcs/pull/1672 to be stablized
+        ///
+        ///
+        // struct HeadNode{
+        //     data:NodeExtraData<HeadTag>,
+        // }
+        // impl<TAG: ListTag> BorrowMut<TAG::Trait> for HeadNode<TAG> {
+        //     fn borrow_mut(&mut self) -> &mut TAG::Trait {
+        //         panic!("error:calling BorrowMut<TAG::Trait>::borrow_mut on HeaderNode")
+        //     }
+        // }
+        //
+        // impl<TAG: ListTag> Borrow<TAG::Trait> for HeadNode<TAG> {
+        //     fn borrow(&self) -> &TAG::Trait {
+        //         panic!("error:calling Borrow<TAG::Trait>::borrow on HeaderNode")
+        //     }
+        // }
+        //
+        // impl<TAG:ListTag> Node<TAG> for HeadNode<TAG>{
+        //     fn extra_data(&self) -> &NodeExtraData<TAG> {
+        //         self.data
+        //     }
+        // }
+
+        pub struct List<TAG:ListTag> {
+            head: NodePtr<TAG>,
+            rear: NodePtr<TAG>,
         }
-        impl<TAG, Trait:?Sized> Drop for List<TAG, Trait> {
+        impl<TAG:ListTag> Drop for List<TAG> {
             fn drop(&mut self) { unsafe {
                 std::alloc::dealloc(
                     self.head.thin().cast(),
-                    Layout::new::<[HeadNode<TAG,Trait>; 2]>(),
+                    Layout::new::<[HeadNode; 2]>(),
                 );
             }}
         }
 
 
-        impl<TAG:'static, Trait: ?Sized+'static> List<TAG, Trait> {
+        impl<TAG:ListTag> List<TAG> {
             pub fn new() -> Self {
                 unsafe {
-                    let head_nodes = alloc(Layout::new::<[HeadNode<TAG, Trait>; 2]>())
-                        .cast::<[HeadNode<TAG, Trait>; 2]>();
-                    let head=NodePtr::new(&mut (*head_nodes)[0]);
-                    let rear= NodePtr::new(& mut (*head_nodes)[1]);
+                    let head_nodes = alloc(Layout::new::<[HeadNode; 2]>())
+                        .cast::<[HeadNode; 2]>();
+                    let head= NodePtr::new(&mut (*head_nodes)[0]);
+                    let rear= NodePtr::new(&mut (*head_nodes)[1]);
                     head.deref().extra_data()
                         .set_prev(NodePtr::null());
                     head.deref().extra_data()
@@ -465,7 +540,7 @@ pub mod data_structure {
                 }
             }
 
-            pub fn insert_front<T:NodeExt<TAG,Trait> + 'static,U:DerefMut<Target=T>>(&self, mut node:U) {
+            pub fn insert_front<T:Node<TAG>,U:Deref<Target=T>>(&self, node:U) {
                 let head = self.head;
                 let node = NodePtr::new(node.deref_mut());
                 head.deref().extra_data()
@@ -479,7 +554,7 @@ pub mod data_structure {
                     .set_prev(head);
             }
 
-            pub fn insert_back(&self, mut node: NodePtr<TAG,Trait>) {
+            pub fn insert_back<T:Node<TAG>,U:Deref<Target=T>>(&self, node: U) {
                 let rear = self.rear;
                 let node = NodePtr::from(node.deref_mut());
                 rear.deref().extra_data()
@@ -536,13 +611,21 @@ pub mod data_structure {
         }
     }
 }
-#[test]
-fn test
+use core::borrow::Borrow;
+use core::borrow::BorrowMut;
 #[test]
 fn test_double_ll() {
+    pub struct Tag1();
+    impl ListTag for Tag1{
+        type Trait =dyn Debug;
+    }
+    pub struct Tag2();
+    impl ListTag for Tag2{
+        type Trait = dyn Debug;
+    }
     pub struct Test {
-        ext1: NodeExtraData<Tag1, dyn Debug>,
-        ext2: NodeExtraData<Tag2, dyn Debug>,
+        ext1: NodeExtraData<Tag1>,
+        ext2: NodeExtraData<Tag2>,
         value: usize,
     }
     impl Debug for Test {
@@ -561,30 +644,26 @@ fn test_double_ll() {
         }
     }
     impl Borrow<dyn Debug> for Test {
-        fn borrow(&self) -> &(dyn Debug + 'static) {
+        fn borrow(&self) -> &(dyn Debug+'static) {
             self
         }
     }
     impl BorrowMut<dyn Debug> for Test {
-        fn borrow_mut(&mut self) -> &mut (dyn Debug + 'static) {
+        fn borrow_mut(&mut self) -> &mut (dyn Debug+'static) {
             self
         }
     }
 
-    pub struct Tag1();
-    pub struct Tag2();
     impl Node<Tag1> for Test {
-        type Trait = dyn Debug;
 
-        fn extra_data(&self) -> &NodeExtraData<Tag1, dyn Debug> {
+        fn extra_data(&self) -> &NodeExtraData<Tag1> {
             &self.ext1
         }
     }
 
     impl Node<Tag2> for Test {
-        type Trait = dyn Debug;
 
-        fn extra_data(&self) -> &NodeExtraData<Tag2, dyn Debug> {
+        fn extra_data(&self) -> &NodeExtraData<Tag2> {
             &self.ext2
         }
     }
@@ -592,14 +671,14 @@ fn test_double_ll() {
     let mut test1 = Test::new(1);
     let mut test2 = Test::new(2);
     let mut test3 = Test::new(3);
-    let test_list_1 = List::<Tag1, dyn Debug>::new();
-    let test_list_2 = List::<Tag2, dyn Debug>::new();
+    let test_list_1 = List::<Tag1>::new();
+    let test_list_2 = List::<Tag2>::new();
     test_list_1.insert_back(NodePtr::new(&mut test3));
     test_list_1.insert_back(NodePtr::new(&mut test1));
     test_list_1.insert_back(NodePtr::new(&mut test2));
     test_list_2.insert_back(NodePtr::new(&mut test1));
     test_list_2.insert_back(NodePtr::new(&mut test2));
-    <Test as NodeExt<Tag1, dyn Debug>>::remove(&test2);
+    <Test as NodeExt<Tag1>>::remove(&test2);
     let mut ptr = test_list_1.head.deref().extra_data().get_next();
     while !ptr.extra_data().get_next().is_null() {
         println!("{:?}", ptr.deref().borrow());

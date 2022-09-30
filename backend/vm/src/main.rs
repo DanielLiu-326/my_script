@@ -1,4 +1,8 @@
 #![feature(ptr_metadata)]
+#![feature(negative_impls)]
+#![feature(auto_traits)]
+extern crate core;
+
 mod opcode;
 
 mod base_types;
