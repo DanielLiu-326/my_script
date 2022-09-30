@@ -1,6 +1,5 @@
 mod script_types;
 
-use crate::script_types::Reference;
 use std::collections::{HashMap, VecDeque};
 
 #[cfg(test)]

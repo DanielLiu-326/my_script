@@ -24,155 +24,314 @@ pub fn deallocate(ptr: *mut c_void) {
         );
     }
 }
+pub mod ptr{
 
-pub mod data_structure {
-
-    pub mod ptr{
-        use std::ops::{Deref, DerefMut};
-        ///
-        /// 指针类型，指向普通类型时大小为usize大小，指向非Thin类型时，大小根据为usize+std::ptr::Metadata大小
-        /// 支持了dyn类型的null值，对null值解引用是未定义的行为
-        ///
-        pub struct Ptr<Dyn: ?Sized> {
-            ptr: *const (),
-            meta: <Dyn as std::ptr::Pointee>::Metadata,
+    pub mod thin_dyn{
+        use core::marker::PhantomData;
+        use core::ops::Deref;
+        use core::ops::DerefMut;
+        /**
+         * 类型
+         */
+        pub unsafe trait Implemented:AsRef<Self::ImplTrait>{
+            type ImplTrait:?Sized;
         }
 
-        impl<Dyn:?Sized> Clone for Ptr<Dyn> {
-            fn clone(&self) -> Self {
-                *self
+        #[repr(C)]
+        pub struct Obj<T:Implemented+Sized> {
+            meta: <T::ImplTrait as std::ptr::Pointee>::Metadata,
+            data: T,
+        }
+        impl<T:Implemented+Sized> From<T> for Obj<T>{
+            fn from(data: T) -> Self {
+                Self{
+                    meta: std::ptr::metadata(data.as_ref() as *const T::ImplTrait),
+                    data: data,
+                }
             }
         }
-        impl<Dyn:?Sized> Copy for Ptr<Dyn> {}
-
-        impl<Dyn: ?Sized> Ptr<Dyn> {
-            pub fn new(ptr: &Dyn) -> Self {
-                Self {
-                    ptr: (ptr as *const Dyn).cast(),
-                    meta: std::ptr::metadata(ptr as *const Dyn),
-                }
-            }
-            pub fn null() -> Self {
-                Self {
-                    ptr: std::ptr::null(),
-                    meta: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
-                }
-            }
-            pub fn is_null(&self) -> bool {
-                self.ptr.is_null()
-            }
-            pub fn thin(&self) -> *const () {
-                return self.ptr;
-            }
-            pub fn metadata(&self) -> <Dyn as std::ptr::Pointee>::Metadata {
+        impl<T:Implemented+Sized> Obj<T> {
+            pub fn meta(&self)-><T::ImplTrait as std::ptr::Pointee>::Metadata{
                 self.meta
             }
-        }
-        impl<Dyn:?Sized> Into<*const Dyn> for Ptr<Dyn> {
-            fn into(self) -> *const Dyn {
-                std::ptr::from_raw_parts(self.ptr,self.meta)
+            pub fn data_mut(&mut self)->&mut T{
+                &mut self.data
             }
-        }
-        impl<Dyn: ?Sized> From<&Dyn> for Ptr<Dyn> {
-            fn from(f: &Dyn) -> Self {
-                Ptr::new(f)
+            pub fn data(&self)->&T{
+                &self.data
             }
-        }
-        impl<Dyn: ?Sized> Deref for Ptr<Dyn> {
-            type Target = Dyn;
-
-            fn deref(&self) -> &Self::Target {
-                unsafe{
-                    &*std::ptr::from_raw_parts(self.ptr, self.meta)
+            pub fn trait_ptr<'a>(&'a self) ->ObjPtr<T::ImplTrait>{
+                ObjPtr{
+                    obj:(&self.data as *const T).cast(),
+                    phantom: Default::default()
                 }
             }
-        }
-        ///
-        /// DynPtrMut:
-        /// 可变胖指针，相对于primitive类型增加了null值，对null值解引用将出错
-        ///
-        pub struct PtrMut<Dyn: ?Sized> {
-            ptr: *mut (),
-            meta: <Dyn as std::ptr::Pointee>::Metadata,
-        }
 
-        impl<Dyn:?Sized> Clone for PtrMut<Dyn> {
-            fn clone(&self) -> Self {
-                *self
-            }
-        }
-
-        impl<Dyn:?Sized> Copy for PtrMut<Dyn> {}
-
-        impl<Dyn: ?Sized> PtrMut<Dyn> {
-            pub fn new(ptr: &mut Dyn) -> Self {
-                Self {
-                    ptr: (ptr as *mut Dyn).cast(),
-                    meta: std::ptr::metadata(ptr as *mut Dyn),
-                }
-            }
-            pub fn null() -> Self {
-                Self {
-                    ptr: std::ptr::null_mut(),
-                    meta: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
-                }
-            }
-            pub fn is_null(&self) -> bool {
-                self.ptr.is_null()
-            }
-            pub fn thin(&self) -> *mut () {
-                self.ptr
-            }
-            pub fn metadata(&self) -> <Dyn as std::ptr::Pointee>::Metadata {
-                self.meta
-            }
-        }
-
-        impl<Dyn:?Sized> Into<*mut Dyn> for PtrMut<Dyn> {
-            fn into(self) -> *mut Dyn {
-                std::ptr::from_raw_parts_mut(self.ptr,self.meta)
-            }
-        }
-        impl<Dyn:?Sized> Into<*const Dyn> for PtrMut<Dyn> {
-            fn into(self) -> *const Dyn {
-                std::ptr::from_raw_parts(self.ptr,self.meta)
-            }
-        }
-
-        impl<Dyn: ?Sized+'static> From<&mut Dyn> for PtrMut<Dyn> {
-            fn from(f: &mut Dyn) -> Self {
-                PtrMut::new(f)
-            }
-        }
-        impl<Dyn: ?Sized> Deref for PtrMut<Dyn> {
-            type Target = Dyn;
-
-            fn deref(&self) -> &Self::Target {
-                unsafe{
-                    &*std::ptr::from_raw_parts(self.ptr, self.meta)
+            pub fn trait_ptr_mut<'a>(&'a mut self) -> ObjPtrMut<T::ImplTrait>{
+                ObjPtrMut{
+                    obj: (&mut self.data as *mut T).cast(),
+                    phantom: Default::default()
                 }
             }
         }
 
-        impl<Dyn: ?Sized> DerefMut for PtrMut<Dyn> {
-            fn deref_mut(&mut self) -> &mut Self::Target {
+
+        /**
+         *  类型的引用
+         */
+
+
+        #[repr(C)]
+        struct Dummy<Trait:?Sized>{
+            meta:<Trait as std::ptr::Pointee>::Metadata,
+            x:(),
+        }
+
+        pub struct ObjRef<'a,ImplTrait:?Sized> {
+            obj:*const (),
+            phantom:PhantomData<&'a ImplTrait>,
+        }
+
+        impl<'a ,Trait:?Sized> Deref for ObjRef<'a,Trait>{
+            type Target = Trait;
+
+            fn deref(&self) -> &'a Self::Target {
+                let dummy:*const Dummy<Self::Target> = self.obj.cast();
                 unsafe {
-                    &mut *std::ptr::from_raw_parts_mut(self.ptr, self.meta)
+                    &*std::ptr::from_raw_parts(&(*dummy).x as *const (),(*dummy).meta)
                 }
+            }
+        }
+
+        pub struct ObjRefMut<'a,ImplTrait:?Sized> {
+            obj:*mut (),
+            phantom:PhantomData<&'a ImplTrait>,
+        }
+
+        impl<'a,Trait: ?Sized> Deref for ObjRefMut<'a, Trait> {
+            type Target = Trait;
+
+            fn deref(&self) -> &Self::Target {
+                let dummy:*const Dummy<Self::Target> = self.obj.cast();
+                unsafe {
+                    &*std::ptr::from_raw_parts(&(*dummy).x as *const (),(*dummy).meta)
+                }
+            }
+        }
+
+        impl<'a,Trait:?Sized> DerefMut for ObjRefMut<'a,Trait>{
+            fn deref_mut(&mut self) -> &mut Self::Target {
+                let dummy:*mut Dummy<Self::Target> = self.obj.cast();
+                unsafe {
+                    &mut *std::ptr::from_raw_parts_mut(&mut (*dummy).x as *mut (),(*dummy).meta)
+                }
+            }
+        }
+
+        /**
+         * 类型的指针
+         */
+
+        pub struct ObjPtr<ImplTrait:?Sized>{
+            obj:*const (),
+            phantom:PhantomData<ImplTrait>,
+        }
+        impl<ImplTrait> Deref for ObjPtr<ImplTrait> {
+            type Target = ImplTrait;
+
+            fn deref(&self) -> &Self::Target {
+                let dummy:*const Dummy<Self::Target> = self.obj.cast();
+                unsafe {
+                    &*std::ptr::from_raw_parts(&(*dummy).x as *const (),(*dummy).meta)
+                }
+            }
+        }
+
+        pub struct ObjPtrMut<ImplTrait:?Sized>{
+            obj:*mut (),
+            phantom:PhantomData<ImplTrait>,
+        }
+
+
+        impl<ImplTrait: ?Sized> Deref for ObjPtrMut<ImplTrait> {
+            type Target = ();
+
+            fn deref(&self) -> &Self::Target {
+                let dummy:*const Dummy<Self::Target> = self.obj.cast();
+                unsafe {
+                    &*std::ptr::from_raw_parts(&(*dummy).x as *const (),(*dummy).meta)
+                }
+            }
+        }
+
+        impl<ImplTrait:?Sized> DerefMut for ObjPtrMut<ImplTrait>{
+            fn deref_mut(&mut self) -> &mut Self::Target {
+                let dummy:*mut Dummy<Self::Target> = self.obj.cast();
+                unsafe {
+                    &mut *std::ptr::from_raw_parts_mut(&mut (*dummy).x as *mut (),(*dummy).meta)
+                }
+            }
+        }
+
+    }
+
+
+
+
+
+
+    use std::ops::{Deref, DerefMut};
+    ///
+    /// 指针类型，指向普通类型时大小为usize大小，指向非Thin类型时，大小根据为usize+std::ptr::Metadata大小
+    /// 支持了dyn类型的null值，对null值解引用是未定义的行为
+    ///
+    pub struct Ptr<Dyn: ?Sized> {
+        ptr: *const (),
+        meta: <Dyn as std::ptr::Pointee>::Metadata,
+    }
+
+    impl<Dyn:?Sized> Clone for Ptr<Dyn> {
+        fn clone(&self) -> Self {
+            *self
+        }
+    }
+    impl<Dyn:?Sized> Copy for Ptr<Dyn> {}
+
+    impl<Dyn: ?Sized> Ptr<Dyn> {
+        pub fn new(ptr: &Dyn) -> Self {
+            Self {
+                ptr: (ptr as *const Dyn).cast(),
+                meta: std::ptr::metadata(ptr as *const Dyn),
+            }
+        }
+        pub fn null() -> Self {
+            Self {
+                ptr: std::ptr::null(),
+                meta: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+            }
+        }
+        pub fn is_null(&self) -> bool {
+            self.ptr.is_null()
+        }
+        pub fn thin(&self) -> *const () {
+            return self.ptr;
+        }
+        pub fn metadata(&self) -> <Dyn as std::ptr::Pointee>::Metadata {
+            self.meta
+        }
+    }
+    impl<Dyn:?Sized> Into<*const Dyn> for Ptr<Dyn> {
+        fn into(self) -> *const Dyn {
+            std::ptr::from_raw_parts(self.ptr,self.meta)
+        }
+    }
+    impl<Dyn: ?Sized> From<&Dyn> for Ptr<Dyn> {
+        fn from(f: &Dyn) -> Self {
+            Ptr::new(f)
+        }
+    }
+    impl<Dyn: ?Sized> Deref for Ptr<Dyn> {
+        type Target = Dyn;
+
+        fn deref(&self) -> &Self::Target {
+            unsafe{
+                &*std::ptr::from_raw_parts(self.ptr, self.meta)
+            }
+        }
+    }
+    ///
+    /// DynPtrMut:
+    /// 可变胖/瘦指针，相对于primitive类型增加了null值，对null值解引用将出错
+    ///
+    pub struct PtrMut<Dyn: ?Sized> {
+        ptr: *mut (),
+        meta: <Dyn as std::ptr::Pointee>::Metadata,
+    }
+
+    impl<Dyn:?Sized> Clone for PtrMut<Dyn> {
+        fn clone(&self) -> Self {
+            *self
+        }
+    }
+
+    impl<Dyn:?Sized> Copy for PtrMut<Dyn> {}
+
+    impl<Dyn: ?Sized> PtrMut<Dyn> {
+        pub fn new(ptr: &mut Dyn) -> Self {
+            Self {
+                ptr: (ptr as *mut Dyn).cast(),
+                meta: std::ptr::metadata(ptr as *mut Dyn),
+            }
+        }
+        pub fn null() -> Self {
+            Self {
+                ptr: std::ptr::null_mut(),
+                meta: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+            }
+        }
+        pub fn is_null(&self) -> bool {
+            self.ptr.is_null()
+        }
+        pub fn thin(&self) -> *mut () {
+            self.ptr
+        }
+        pub fn metadata(&self) -> <Dyn as std::ptr::Pointee>::Metadata {
+            self.meta
+        }
+    }
+
+    impl<Dyn:?Sized> Into<*mut Dyn> for PtrMut<Dyn> {
+        fn into(self) -> *mut Dyn {
+            std::ptr::from_raw_parts_mut(self.ptr,self.meta)
+        }
+    }
+    impl<Dyn:?Sized> Into<*const Dyn> for PtrMut<Dyn> {
+        fn into(self) -> *const Dyn {
+            std::ptr::from_raw_parts(self.ptr,self.meta)
+        }
+    }
+
+    impl<Dyn: ?Sized+'static> From<&mut Dyn> for PtrMut<Dyn> {
+        fn from(f: &mut Dyn) -> Self {
+            PtrMut::new(f)
+        }
+    }
+    impl<Dyn: ?Sized> Deref for PtrMut<Dyn> {
+        type Target = Dyn;
+
+        fn deref(&self) -> &Self::Target {
+            unsafe{
+                &*std::ptr::from_raw_parts(self.ptr, self.meta)
             }
         }
     }
 
+    impl<Dyn: ?Sized> DerefMut for PtrMut<Dyn> {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            unsafe {
+                &mut *std::ptr::from_raw_parts_mut(self.ptr, self.meta)
+            }
+        }
+    }
+}
+pub mod data_structure {
     pub mod double_ll {
         use std::alloc::{alloc, Layout};
         use std::borrow::{Borrow, BorrowMut};
         use std::cell::Cell;
         use std::fmt::{Debug, Formatter};
         use std::ops::{Deref, DerefMut};
-        use crate::util::data_structure::ptr::PtrMut;
+        use crate::util::ptr::PtrMut;
 
+
+        ///
+        /// 节点的前向/后向指针类型
+        ///
         pub type NodePtr<TAG,Trait:?Sized> = PtrMut<dyn NodeExt<TAG, Trait>>;
 
+        ///
+        /// 一个类型作为节点所需要的指针信息
+        ///
         pub struct NodeExtraData<TAG,Trait:?Sized> {
             next:Cell<NodePtr<TAG,Trait>>,
             prev:Cell<NodePtr<TAG,Trait>>,
@@ -206,11 +365,30 @@ pub mod data_structure {
             }
         }
 
-        pub trait Node<TAG> {
+
+        ///
+        /// 一个类型想要当作List的节点就必须实现Node
+        ///
+        /// **泛型参数:**
+        ///
+        /// - TAG:同一个节点可以在不同的List中，节点要存储多个List的指针信息，用0大小的类型当作Tag来区分他们
+        ///
+        ///
+        pub trait Node<TAG:Implemented>:AsRef<TAG::Trait> {
+            /// 对象所在的List都实现过的
+            /// Trait关联类型需要是一个dyn Trait，rust没有associated Trait 所以只能用dyn trait来代替，并通过
             type Trait: ?Sized;
+            /// 返回节点的附加信息
             fn extra_data(&self)->&NodeExtraData<TAG,Self::Trait>;
         }
 
+        ///
+        /// 类型想要作为List节点的第二个限制，必须实现过NodeExt
+        ///
+        /// - NodeExt是对Node的补充，Node的Node::Trait并不能约束实现了Node类型的一定实现过Trait类型。
+        /// - NodeExt将会为所有实现过BorrowMut<Trait>和Node的类型自动实现，不需要手动实现
+        /// - NodeExt对外的作用是可以通过对象本身来从它所在的List中移除
+        ///
         pub trait NodeExt<TAG,Trait:?Sized> :Node<TAG,Trait=Trait>+BorrowMut<Trait>{
             fn remove(&self){
                 self.extra_data().set_next(
@@ -356,73 +534,75 @@ pub mod data_structure {
                 self.head.extra_data().get_next().is_null()
             }
         }
-        #[test]
-        fn test() {
-            pub struct Test {
-                ext1: NodeExtraData<Tag1, dyn Debug>,
-                ext2: NodeExtraData<Tag2, dyn Debug>,
-                value: usize,
-            }
-            impl Debug for Test {
-                fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-                    write!(f, "{},", self.value)?;
-                    return Ok(());
-                }
-            }
-            impl Test {
-                pub fn new(value: usize) -> Self {
-                    Self {
-                        ext1: Default::default(),
-                        ext2: Default::default(),
-                        value,
-                    }
-                }
-            }
-            impl Borrow<dyn Debug> for Test {
-                fn borrow(&self) -> &(dyn Debug + 'static) {
-                    self
-                }
-            }
-            impl BorrowMut<dyn Debug> for Test {
-                fn borrow_mut(&mut self) -> &mut (dyn Debug + 'static) {
-                    self
-                }
-            }
-
-            pub struct Tag1();
-            pub struct Tag2();
-            impl Node<Tag1> for Test {
-                type Trait = dyn Debug;
-
-                fn extra_data(&self) -> &NodeExtraData<Tag1, dyn Debug> {
-                    &self.ext1
-                }
-            }
-
-            impl Node<Tag2> for Test {
-                type Trait = dyn Debug;
-
-                fn extra_data(&self) -> &NodeExtraData<Tag2, dyn Debug> {
-                    &self.ext2
-                }
-            }
-
-            let mut test1 = Test::new(1);
-            let mut test2 = Test::new(2);
-            let mut test3 = Test::new(3);
-            let test_list_1 = List::<Tag1, dyn Debug>::new();
-            let test_list_2 = List::<Tag2, dyn Debug>::new();
-            test_list_1.insert_back(NodePtr::new(&mut test3));
-            test_list_1.insert_back(NodePtr::new(&mut test1));
-            test_list_1.insert_back(NodePtr::new(&mut test2));
-            test_list_2.insert_back(NodePtr::new(&mut test1));
-            test_list_2.insert_back(NodePtr::new(&mut test2));
-            <Test as NodeExt<Tag1, dyn Debug>>::remove(&test2);
-            let mut ptr = test_list_1.head.deref().extra_data().get_next();
-            while !ptr.extra_data().get_next().is_null() {
-                println!("{:?}", ptr.deref().borrow());
-                ptr = ptr.deref_mut().extra_data().get_next();
+    }
+}
+#[test]
+fn test
+#[test]
+fn test_double_ll() {
+    pub struct Test {
+        ext1: NodeExtraData<Tag1, dyn Debug>,
+        ext2: NodeExtraData<Tag2, dyn Debug>,
+        value: usize,
+    }
+    impl Debug for Test {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{},", self.value)?;
+            return Ok(());
+        }
+    }
+    impl Test {
+        pub fn new(value: usize) -> Self {
+            Self {
+                ext1: Default::default(),
+                ext2: Default::default(),
+                value,
             }
         }
+    }
+    impl Borrow<dyn Debug> for Test {
+        fn borrow(&self) -> &(dyn Debug + 'static) {
+            self
+        }
+    }
+    impl BorrowMut<dyn Debug> for Test {
+        fn borrow_mut(&mut self) -> &mut (dyn Debug + 'static) {
+            self
+        }
+    }
+
+    pub struct Tag1();
+    pub struct Tag2();
+    impl Node<Tag1> for Test {
+        type Trait = dyn Debug;
+
+        fn extra_data(&self) -> &NodeExtraData<Tag1, dyn Debug> {
+            &self.ext1
+        }
+    }
+
+    impl Node<Tag2> for Test {
+        type Trait = dyn Debug;
+
+        fn extra_data(&self) -> &NodeExtraData<Tag2, dyn Debug> {
+            &self.ext2
+        }
+    }
+
+    let mut test1 = Test::new(1);
+    let mut test2 = Test::new(2);
+    let mut test3 = Test::new(3);
+    let test_list_1 = List::<Tag1, dyn Debug>::new();
+    let test_list_2 = List::<Tag2, dyn Debug>::new();
+    test_list_1.insert_back(NodePtr::new(&mut test3));
+    test_list_1.insert_back(NodePtr::new(&mut test1));
+    test_list_1.insert_back(NodePtr::new(&mut test2));
+    test_list_2.insert_back(NodePtr::new(&mut test1));
+    test_list_2.insert_back(NodePtr::new(&mut test2));
+    <Test as NodeExt<Tag1, dyn Debug>>::remove(&test2);
+    let mut ptr = test_list_1.head.deref().extra_data().get_next();
+    while !ptr.extra_data().get_next().is_null() {
+        println!("{:?}", ptr.deref().borrow());
+        ptr = ptr.deref_mut().extra_data().get_next();
     }
 }

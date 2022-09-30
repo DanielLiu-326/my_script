@@ -1,17 +1,8 @@
-use std::borrow::Borrow;
-use std::collections::HashMap;
-use std::ffi::c_void;
-use std::marker::PhantomData;
-use std::mem::swap;
-use std::ops::{Deref, DerefMut};
-use std::panic::PanicInfo;
-use std::ptr::{null, null_mut};
-use std::sync::atomic::AtomicBool;
 use super::util;
 use util::data_structure::double_ll::List as DoubleRawList;
 use util::data_structure::double_ll::NodeExt;
 use crate::util::data_structure::double_ll::{List, Node, NodeExtraData, NodePtr};
-use crate::util::data_structure::ptr::{Ptr, PtrMut};
+use crate::util::ptr::{Ptr, PtrMut};
 
 // root                  //child change, self deleted, become not root
 // unstable              //child change，self deleted，become root
@@ -57,43 +48,6 @@ use crate::util::data_structure::ptr::{Ptr, PtrMut};
 //      }
 // }
 
-pub unsafe trait Implemented{
-    type ImplTrait:?Sized;
-
-}
-#[repr(C,packed)]
-pub struct Obj<T:Implemented+Sized> {
-    meta: <T::ImplTrait as std::ptr::Pointee>::Metadata,
-    data: T,
-}
-pub struct ObjRef<'a,ImplTrait:?Sized> {
-    obj:*const (),
-    phantom:PhantomData<&'a ImplTrait>,
-}
-impl<'a ,Trait:?Sized> Deref for ObjRef<'a,Trait>{
-    type Target = Trait;
-
-    fn deref(&self) -> &'a Self::Target {
-        #[repr(C,packed)]
-        struct Dummy<Trait:?Sized>{
-            meta:<Trait as std::ptr::Pointee>::Metadata,
-            x:(),
-        }
-        let dummy:*const Dummy<Self::Target> = self.obj.cast();
-        unsafe {
-            &*std::ptr::from_raw_parts(&(*dummy).x as *const (),(*dummy).meta)
-        }
-    }
-}
-pub struct ObjRefMut<'a,ImplTrait> {
-    obj:*mut (),
-    phantom:PhantomData<&'a ImplTrait>,
-}
-
-//
-// pub struct ObjPtr<T:Implemented>{
-//
-// }
 
 
 //
@@ -371,3 +325,8 @@ pub struct ObjRefMut<'a,ImplTrait> {
 //     }
 //
 // }
+
+#[test]
+fn test(){
+
+}
