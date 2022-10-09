@@ -3,7 +3,7 @@ use std::alloc::Layout;
 use std::ffi::c_void;
 use std::fmt::{Debug, Formatter};
 use std::mem::size_of;
-use crate::util::data_structure::double_ll::{List, ListTag, Node, NodeExt, NodeExtraData, NodePtr};
+use crate::util::data_structure::double_ll::{Implemented, List, ListTag, Node, NodeExt, NodeExtraData, NodePtr};
 
 #[inline]
 pub fn allocate(size: usize) -> *mut c_void {
@@ -81,8 +81,6 @@ pub mod ptr{
         /**
          *  类型的引用
          */
-
-
         #[repr(C)]
         struct Dummy<Trait:?Sized>{
             meta:<Trait as std::ptr::Pointee>::Metadata,
@@ -133,7 +131,6 @@ pub mod ptr{
         /**
          * 类型的指针
          */
-
         pub struct ObjPtr<ImplTrait:?Sized>{
             obj:*const (),
             phantom:PhantomData<ImplTrait>,
@@ -176,11 +173,6 @@ pub mod ptr{
         }
 
     }
-
-
-
-
-
 
     use std::ops::{Deref, DerefMut};
     ///
@@ -265,18 +257,22 @@ pub mod ptr{
                 meta: std::ptr::metadata(ptr as *mut Dyn),
             }
         }
+        #[inline]
         pub fn null() -> Self {
             Self {
                 ptr: std::ptr::null_mut(),
                 meta: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
             }
         }
+        #[inline]
         pub fn is_null(&self) -> bool {
             self.ptr.is_null()
         }
+        #[inline]
         pub fn thin(&self) -> *mut () {
             self.ptr
         }
+        #[inline]
         pub fn metadata(&self) -> <Dyn as std::ptr::Pointee>::Metadata {
             self.meta
         }
@@ -318,23 +314,26 @@ pub mod ptr{
 }
 pub mod data_structure {
     pub mod double_ll {
-        use core::panicking::panic;
         use std::alloc::{alloc, Layout};
         use std::borrow::{Borrow, BorrowMut};
         use std::cell::Cell;
         use std::fmt::{Debug, Formatter};
         use std::io::Take;
         use std::ops::{Deref, DerefMut};
-        use crate::util::ptr::PtrMut;
+        use crate::util::ptr::{Ptr, PtrMut};
 
-        pub trait ListTag{
+        /// 一个类型实现了Implemented<Trait>，就看作它实现了Trait，这里用TraitObject代替Dyn
+        pub trait Implemented<Trait:?Sized>:AsRef<Trait>+AsMut<Trait>{}
+
+        /// ListTag是Tag实现的类型，Trait代表该List每个元素都实现的Trait，Tag用于区分不同的List
+        pub trait ListTag:'static{
             type Trait:?Sized;
         }
 
         ///
         /// 节点的前向/后向指针类型
         ///
-        pub type NodePtr<TAG:ListTag> = PtrMut<dyn NodeExt<TAG>>;
+        pub type NodePtr<TAG> = PtrMut<dyn Node<TAG>>;
 
         ///
         /// 一个类型作为节点所需要的指针信息
@@ -381,129 +380,162 @@ pub mod data_structure {
         /// - TAG:同一个节点可以在不同的List中，节点要存储多个List的指针信息，用0大小的类型当作Tag来区分他们
         ///
 
-        pub trait Node<TAG:ListTag>:BorrowMut<TAG::Trait> {
+        pub trait Node<TAG:ListTag>:Implemented<TAG::Trait> {
             /// 返回节点的附加信息
             fn extra_data(&self)->&NodeExtraData<TAG>;
         }
 
         ///
-        /// 类型想要作为List节点的第二个限制，必须实现过NodeExt
-        ///
-        /// - NodeExt是对Node的补充，Node的Node::Trait并不能约束实现了Node类型的一定实现过Trait类型。
-        /// - NodeExt将会为所有实现过BorrowMut<Trait>和Node的类型自动实现，不需要手动实现
-        /// - NodeExt对外的作用是可以通过对象本身来从它所在的List中移除
+        /// NodeExt是对Node的补充,增加了实用方法
         ///
         pub trait NodeExt<TAG:ListTag>{
             fn remove(&self);
             fn as_trait(&self)->&TAG::Trait;
-            fn as_trait_mut(&self)->&TAG::Trait;
+            fn as_trait_mut(&mut self)->&TAG::Trait;
             fn get_next(&self)->NodePtr<TAG>;
             fn set_next(&self,next:NodePtr<TAG>);
             fn get_prev(&self)->NodePtr<TAG>;
             fn set_prev(&self,prev:NodePtr<TAG>);
         }
-
-        impl <TAG:ListTag,T> NodeExt<TAG> for T
-            where T:Node<TAG>, {
+        impl <TAG:ListTag,T:Node<TAG>+?Sized> NodeExt<TAG> for T {
+            #[inline]
             fn remove(&self){
-                self.extra_data().set_next(
-                    self.extra_data()
-                        .get_next()
-                        .deref()
-                        .extra_data()
-                        .get_next()
-                )
+                self.get_prev().set_next(self.get_next());
+                self.get_next().set_prev(self.get_prev());
             }
+            #[inline]
             fn as_trait(&self) -> &TAG::Trait {
-                return self.borrow()
+                return self.as_ref()
             }
-            fn as_trait_mut(&self) -> &TAG::Trait {
-                return self.borrow_mut()
+            #[inline]
+            fn as_trait_mut(&mut self) -> &TAG::Trait {
+                return self.as_mut()
             }
+            #[inline]
             fn get_next(&self) -> NodePtr<TAG> {
                 self.extra_data().get_next()
             }
+            #[inline]
             fn set_next(&self, next: NodePtr<TAG>) {
                 self.extra_data().set_next(next)
             }
+            #[inline]
             fn get_prev(&self) -> NodePtr<TAG> {
                 self.extra_data().get_prev()
             }
+            #[inline]
             fn set_prev(&self, prev: NodePtr<TAG>) {
                 self.extra_data().set_prev(prev)
             }
         }
+
+        ///
+        /// 头节点实现。
+        ///
         struct HeadNode<TAG:ListTag>{
-            data:NodeExtraData<TAG>,
-        }
-        impl<TAG:ListTag> NodeExt<TAG> for HeadNode<TAG>{
-            fn remove(&self) {
-                self.data.set_next(
-                    self.extra_data()
-                        .get_next()
-                        .deref()
-                        .extra_data()
-                        .get_next()
-                )
-            }
-            fn as_trait(&self) -> &TAG::Trait {
-                panic!("error:calling Borrow<TAG::Trait>::borrow on HeaderNode")
-            }
-            fn as_trait_mut(&self) -> &TAG::Trait {
-                panic!("error:calling BorrowMut<TAG::Trait>::borrow_mut on HeaderNode")
-            }
-            fn get_next(&self) -> NodePtr<TAG> {
-                self.data.get_next()
-            }
-            fn set_next(&self, next: NodePtr<TAG>) {
-                self.data.set_next(next)
-            }
-            fn get_prev(&self) -> NodePtr<TAG> {
-                self.data.get_prev()
-            }
-            fn set_prev(&self, prev: NodePtr<TAG>) {
-                self.data.set_prev(prev)
-            }
-
+            extra:NodeExtraData<TAG>,
         }
 
-        /// deprecated cuased by:
-        ///
-        /// error[E0119]: conflicting implementations of trait `std::borrow::BorrowMut<util::data_structure::double_ll::HeadNode<_>>` for type `util::data_structure::double_ll::HeadNode<_>`
-        ///    --> src\util.rs:414:9
-        ///     |
-        /// 414 |         impl<TAG: ListTag> BorrowMut<TAG::Trait> for HeadNode<TAG> {
-        ///     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        ///     |
-        ///     = note: conflicting implementation in crate `core`:
-        ///             - impl<T> BorrowMut<T> for T
-        ///               where T: ?Sized;
-        ///
-        /// reference: https://github.com/rust-lang/rust/issues/56804
-        /// wait for   https://github.com/rust-lang/rfcs/pull/1672 to be stablized
-        ///
-        ///
-        // struct HeadNode{
-        //     data:NodeExtraData<HeadTag>,
-        // }
-        // impl<TAG: ListTag> BorrowMut<TAG::Trait> for HeadNode<TAG> {
-        //     fn borrow_mut(&mut self) -> &mut TAG::Trait {
-        //         panic!("error:calling BorrowMut<TAG::Trait>::borrow_mut on HeaderNode")
-        //     }
-        // }
-        //
-        // impl<TAG: ListTag> Borrow<TAG::Trait> for HeadNode<TAG> {
-        //     fn borrow(&self) -> &TAG::Trait {
-        //         panic!("error:calling Borrow<TAG::Trait>::borrow on HeaderNode")
-        //     }
-        // }
-        //
-        // impl<TAG:ListTag> Node<TAG> for HeadNode<TAG>{
-        //     fn extra_data(&self) -> &NodeExtraData<TAG> {
-        //         self.data
-        //     }
-        // }
+        impl<TAG: ListTag> Implemented<TAG::Trait> for HeadNode<TAG> {}
 
+        impl<TAG: ListTag> AsRef<TAG::Trait> for HeadNode<TAG> {
+            fn as_ref(&self) -> &TAG::Trait {
+                panic!("called AsRef::as_ref() on head node")
+            }
+        }
+
+        impl<TAG: ListTag> AsMut<TAG::Trait> for HeadNode<TAG> {
+            fn as_mut(&mut self) -> &mut TAG::Trait {
+                panic!("called AsMut::as_mut() on head node")
+            }
+        }
+
+        impl<TAG:ListTag> Node<TAG> for HeadNode<TAG>{
+            fn extra_data(&self) -> &NodeExtraData<TAG> {
+                &self.extra
+            }
+        }
+
+        ///
+        /// 双向链表类型，TAG用于区分不同的类型，并通过实现ListNode中的Trait关联类型来确定链表每个元素都有的Trait类型。
+        /// 
+        /// ```rust
+        ///     pub struct Tag1();
+        ///     impl ListTag for Tag1{
+        ///         type Trait =dyn Debug;
+        ///     }
+        ///     pub struct Tag2();
+        ///     impl ListTag for Tag2{
+        ///         type Trait = dyn Debug;
+        ///     }
+        ///     pub struct Test {
+        ///         ext1: NodeExtraData<Tag1>,
+        ///         ext2: NodeExtraData<Tag2>,
+        ///         value: usize,
+        ///     }
+        ///     impl Debug for Test {
+        ///         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        ///             write!(f, "{},", self.value)?;
+        ///             return Ok(());
+        ///         }
+        ///     }
+        ///     impl Test {
+        ///         pub fn new(value: usize) -> Self {
+        ///             Self {
+        ///                 ext1: Default::default(),
+        ///                 ext2: Default::default(),
+        ///                 value,
+        ///             }
+        ///         }
+        ///     }
+        /// 
+        ///     impl AsRef<<Tag1 as ListTag>::Trait> for Test {
+        ///         fn as_ref(&self) -> &<Tag1 as ListTag>::Trait {
+        ///             self
+        ///         }
+        ///     }
+        ///     impl AsMut<<Tag1 as ListTag>::Trait> for Test {
+        ///         fn as_mut(&mut self) -> &mut <Tag1 as ListTag>::Trait {
+        ///             self
+        ///         }
+        ///     }
+        ///     impl Implemented<<Tag1 as ListTag>::Trait> for Test {}
+        ///     impl Node<Tag1> for Test {
+        ///         fn extra_data(&self) -> &NodeExtraData<Tag1> {
+        ///             &self.ext1
+        ///         }
+        ///     }
+        /// 
+        ///     impl Node<Tag2> for Test {
+        ///         fn extra_data(&self) -> &NodeExtraData<Tag2> {
+        ///             &self.ext2
+        ///         }
+        ///     }
+        /// 
+        ///     let mut test1 = Test::new(1);
+        ///     let mut test2 = Test::new(2);
+        ///     let mut test3 = Test::new(3);
+        ///     let test_list_1 = List::<Tag1>::new();
+        ///     let test_list_2 = List::<Tag2>::new();
+        ///     test_list_1.insert_back(NodePtr::new(&mut test3));
+        ///     test_list_1.insert_back(NodePtr::new(&mut test1));
+        ///     test_list_1.insert_back(NodePtr::new(&mut test2));
+        ///     test_list_2.insert_back(NodePtr::new(&mut test1));
+        ///     test_list_2.insert_back(NodePtr::new(&mut test2));
+        ///     <Test as NodeExt<Tag1>>::remove(&test2);
+        ///     let mut ptr = test_list_1.head_next();
+        ///     while !ptr.get_next().is_null() {
+        ///         println!("{:?}", ptr.as_ref());
+        ///         ptr = ptr.get_next();
+        ///     }
+        ///     println!(" ");
+        ///     let mut ptr = test_list_2.head_next();
+        ///     while !ptr.get_next().is_null() {
+        ///         println!("{:?}", ptr.as_mut());
+        ///         ptr = ptr.get_next();
+        ///     }
+        /// ```
+        ///
         pub struct List<TAG:ListTag> {
             head: NodePtr<TAG>,
             rear: NodePtr<TAG>,
@@ -512,7 +544,7 @@ pub mod data_structure {
             fn drop(&mut self) { unsafe {
                 std::alloc::dealloc(
                     self.head.thin().cast(),
-                    Layout::new::<[HeadNode; 2]>(),
+                    Layout::new::<[HeadNode<TAG>; 2]>(),
                 );
             }}
         }
@@ -521,98 +553,90 @@ pub mod data_structure {
         impl<TAG:ListTag> List<TAG> {
             pub fn new() -> Self {
                 unsafe {
-                    let head_nodes = alloc(Layout::new::<[HeadNode; 2]>())
-                        .cast::<[HeadNode; 2]>();
+                    /**
+                     * 分配节点
+                     */
+                    let head_nodes = alloc(Layout::new::<[HeadNode<TAG>; 2]>())
+                        .cast::<[HeadNode<TAG>; 2]>();
                     let head= NodePtr::new(&mut (*head_nodes)[0]);
                     let rear= NodePtr::new(&mut (*head_nodes)[1]);
-                    head.deref().extra_data()
-                        .set_prev(NodePtr::null());
-                    head.deref().extra_data()
-                        .set_next(rear);
-                    rear.deref().extra_data()
-                        .set_prev(head);
-                    rear.deref().extra_data()
-                        .set_next(NodePtr::null());
+                    /**
+                     * 连接头尾节点。
+                     */
+                    head.set_prev(NodePtr::null());
+                    head.set_next(rear);
+                    rear.set_prev(head);
+                    rear.set_next(NodePtr::null());
                     Self {
-                        head: NodePtr::from(head),
-                        rear: NodePtr::from(rear),
+                        head,
+                        rear,
                     }
                 }
             }
 
-            pub fn insert_front<T:Node<TAG>,U:Deref<Target=T>>(&self, node:U) {
+            /// head_next:
+            ///
+            /// 返回头节点的下一个节点，如果链表为空返回尾节点
+            pub fn head_next(&self)->NodePtr<TAG>{
+                self.head.get_next()
+            }
+
+            /// 头插节点
+            pub fn insert_front<U:DerefMut<Target=dyn Node<TAG>>>(&self, mut node:U) {
                 let head = self.head;
                 let node = NodePtr::new(node.deref_mut());
-                head.deref().extra_data()
-                    .get_next().deref().extra_data()
-                    .set_prev(node);
-                head.deref().extra_data()
-                    .set_next(node);
-                node.extra_data()
-                    .set_next(head.deref().extra_data().get_next());
-                node.extra_data()
-                    .set_prev(head);
+                head.get_next().set_prev(node);
+                head.set_next(node);
+                node.set_next(head.get_next());
+                node.set_prev(head);
             }
 
-            pub fn insert_back<T:Node<TAG>,U:Deref<Target=T>>(&self, node: U) {
+            ///尾插节点
+            pub fn insert_back<U:DerefMut<Target=dyn Node<TAG>>>(&self, mut node: U) {
                 let rear = self.rear;
-                let node = NodePtr::from(node.deref_mut());
-                rear.deref().extra_data()
-                    .get_prev().extra_data()
-                    .set_next(node);
-                rear.deref().extra_data()
-                    .set_prev(node);
-                node.deref().extra_data()
-                    .set_next(rear);
-                node.deref().extra_data()
-                    .set_prev(rear.extra_data().get_prev());
+                let node = NodePtr::new(node.deref_mut());
+                rear.get_prev().set_next(node);
+                rear.set_prev(node);
+                node.set_next(rear);
+                node.set_prev(rear.get_prev());
             }
 
+            /// 将另一个链表的全部节点头插到本链表的前面，时间复杂度O(1)
             pub fn concat_front(&self, other: &Self) {
                 //remove the nodes from other list
-                let other_first = other.head.deref().extra_data().get_next();
-                let other_last = other.rear.deref().extra_data().get_prev();
-                other.head.deref().extra_data().set_next(other.rear);
-                other.rear.deref().extra_data().set_prev(other.head);
+                let other_first = other.head.get_next();
+                let other_last = other.rear.get_prev();
+                other.head.set_next(other.rear);
+                other.rear.set_prev(other.head);
                 //concat those nodes to the front of self
-                other_last.deref().extra_data()
-                    .set_next(self.head.deref().extra_data().get_next());
-                self.head.deref().extra_data()
-                    .get_next().deref().extra_data()
-                    .set_prev(other_last);
+                other_last.set_next(self.head.get_next());
+                self.head.get_next().set_prev(other_last);
 
-                other_first.deref().extra_data()
-                    .set_prev(self.head);
-                self.head.deref().extra_data()
-                    .set_next(other_last);
+                other_first.set_prev(self.head);
+                self.head.set_next(other_last);
             }
 
+            /// 将另一个链表的全部节点尾插到本链表的前面，时间复杂度O(1)
             pub fn concat_back(&self, other: &mut Self) {
                 //remove the nodes from other list
-                let other_first = other.head.deref().extra_data().get_next();
-                let other_last = other.rear.deref().extra_data().get_prev();
-                other.head.deref().extra_data().set_next(other.rear);
-                other.rear.deref().extra_data().set_prev(other.head);
+                let other_first = other.head.get_next();
+                let other_last = other.rear.get_prev();
+                other.head.set_next(other.rear);
+                other.rear.set_prev(other.head);
                 //concat those nodes to the rear of self
-                other_first.deref().extra_data()
-                    .set_prev(self.rear.deref().extra_data().get_prev());
-                self.rear.deref().extra_data()
-                    .get_prev().deref().extra_data()
-                    .set_next(other_first);
+                other_first.set_prev(self.rear.get_prev());
+                self.rear.get_prev().set_next(other_first);
 
-                other_last.deref().extra_data()
-                    .set_next(self.rear);
-                self.rear.extra_data()
-                    .set_prev(other_last);
+                other_last.set_next(self.rear);
+                self.rear.set_prev(other_last);
             }
+            /// 链表是否为空
             pub fn empty(&self) -> bool {
-                self.head.extra_data().get_next().is_null()
+                self.head.get_next().is_null()
             }
         }
     }
 }
-use core::borrow::Borrow;
-use core::borrow::BorrowMut;
 #[test]
 fn test_double_ll() {
     pub struct Tag1();
@@ -643,26 +667,25 @@ fn test_double_ll() {
             }
         }
     }
-    impl Borrow<dyn Debug> for Test {
-        fn borrow(&self) -> &(dyn Debug+'static) {
-            self
-        }
-    }
-    impl BorrowMut<dyn Debug> for Test {
-        fn borrow_mut(&mut self) -> &mut (dyn Debug+'static) {
-            self
-        }
-    }
 
+    impl AsRef<<Tag1 as ListTag>::Trait> for Test {
+        fn as_ref(&self) -> &<Tag1 as ListTag>::Trait {
+            self
+        }
+    }
+    impl AsMut<<Tag1 as ListTag>::Trait> for Test {
+        fn as_mut(&mut self) -> &mut <Tag1 as ListTag>::Trait {
+            self
+        }
+    }
+    impl Implemented<<Tag1 as ListTag>::Trait> for Test {}
     impl Node<Tag1> for Test {
-
         fn extra_data(&self) -> &NodeExtraData<Tag1> {
             &self.ext1
         }
     }
 
     impl Node<Tag2> for Test {
-
         fn extra_data(&self) -> &NodeExtraData<Tag2> {
             &self.ext2
         }
@@ -679,9 +702,16 @@ fn test_double_ll() {
     test_list_2.insert_back(NodePtr::new(&mut test1));
     test_list_2.insert_back(NodePtr::new(&mut test2));
     <Test as NodeExt<Tag1>>::remove(&test2);
-    let mut ptr = test_list_1.head.deref().extra_data().get_next();
-    while !ptr.extra_data().get_next().is_null() {
-        println!("{:?}", ptr.deref().borrow());
-        ptr = ptr.deref_mut().extra_data().get_next();
+    let mut ptr = test_list_1.head_next();
+    while !ptr.get_next().is_null() {
+        println!("{:?}", ptr.as_ref());
+        ptr = ptr.get_next();
     }
+    println!(" ");
+    let mut ptr = test_list_2.head_next();
+    while !ptr.get_next().is_null() {
+        println!("{:?}", ptr.as_mut());
+        ptr = ptr.get_next();
+    }
+
 }

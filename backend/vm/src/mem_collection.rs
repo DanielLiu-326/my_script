@@ -50,22 +50,19 @@ use crate::util::ptr::{Ptr, PtrMut};
 
 
 
-//
-// pub enum ValueType{
-//
-// }
-//
-// pub trait RefObj{
-//     fn val_type()->ValueType{
-//
-//     }
-// }
-// pub struct Reference{
-//
-// }
-// impl Reference{
-//
-// }
+
+pub trait RefObj {
+    type ValueKind;
+    fn val_type(&self)->ValueKind;
+}
+pub struct Reference{
+
+}
+impl Reference{
+
+}
+
+
 
 
 
