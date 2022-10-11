@@ -44,6 +44,7 @@ pub mod ptr{
             meta: <T::ImplTrait as std::ptr::Pointee>::Metadata,
             data: T,
         }
+
         impl<T:Implemented+Sized> From<T> for Obj<T>{
             fn from(data: T) -> Self {
                 Self{
@@ -52,6 +53,7 @@ pub mod ptr{
                 }
             }
         }
+
         impl<T:Implemented+Sized> Obj<T> {
             pub fn meta(&self)-><T::ImplTrait as std::ptr::Pointee>::Metadata{
                 self.meta
@@ -150,7 +152,11 @@ pub mod ptr{
             obj:*mut (),
             phantom:PhantomData<ImplTrait>,
         }
+        impl<ImplTrait:?Sized> ObjPtrMut<ImplTrait>{
+            fn new()->Self{
 
+            }
+        }
 
         impl<ImplTrait: ?Sized> Deref for ObjPtrMut<ImplTrait> {
             type Target = ();

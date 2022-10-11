@@ -1,3 +1,5 @@
+use std::any::Any;
+use std::boxed;
 use super::util;
 use util::data_structure::double_ll::List as DoubleRawList;
 use util::data_structure::double_ll::NodeExt;
@@ -50,16 +52,22 @@ use crate::util::ptr::{Ptr, PtrMut};
 
 
 
+use util::ptr::thin_dyn::{Obj,Implemented,ObjPtr};
 
-pub trait RefObj {
-    type ValueKind;
-    fn val_type(&self)->ValueKind;
+pub trait RefObj :std::any::Any{
+
 }
 pub struct Reference{
-
+    inner:ObjPtr<dyn RefObj>
 }
-impl Reference{
 
+impl Reference{
+    fn new<T:Implemented<RefObj>>(mut boxed:Box<T>)->Self{
+        let raw = Box::into_raw(boxed);
+        Self{
+            inner:ObjPtr::
+        }
+    }
 }
 
 
