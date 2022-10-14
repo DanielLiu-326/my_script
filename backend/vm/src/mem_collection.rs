@@ -1,5 +1,6 @@
 use std::any::Any;
 use std::boxed;
+use std::ops::DerefMut;
 use super::util;
 use util::data_structure::double_ll::List as DoubleRawList;
 use util::data_structure::double_ll::NodeExt;
@@ -53,22 +54,33 @@ use crate::util::ptr::{Ptr, PtrMut};
 
 
 use util::ptr::thin_dyn::{Obj,Implemented,ObjPtr};
+use crate::util::ptr::thin_dyn::ObjPtrMut;
 
-pub trait RefObj :std::any::Any{
-
-}
-pub struct Reference{
-    inner:ObjPtr<dyn RefObj>
+pub trait RefObj:Implemented<ImplTrait=Self::Impl>{
+    type Impl:?Sized+std::any::Any+'static;
 }
 
-impl Reference{
-    fn new<T:Implemented<RefObj>>(mut boxed:Box<T>)->Self{
-        let raw = Box::into_raw(boxed);
-        Self{
-            inner:ObjPtr::
-        }
+pub struct Reference<Trait:?Sized+std::any::Any+'static>{
+    inner:ObjPtrMut<Trait>,
+}
+
+impl<Trait:?Sized+std::any::Any+'static> Reference<Trait> {
+    fn new<T: RefObj<Impl = Trait>>(mut obj: Obj<T>) -> Self {
+        let mut obj = Box::new(obj);
+        let ret = Self {
+            inner: obj.trait_ptr_mut(),
+        };
+        std::mem::forget(obj);
+        return ret;
     }
 }
+
+
+
+
+
+
+
 
 
 

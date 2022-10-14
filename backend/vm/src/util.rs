@@ -152,11 +152,6 @@ pub mod ptr{
             obj:*mut (),
             phantom:PhantomData<ImplTrait>,
         }
-        impl<ImplTrait:?Sized> ObjPtrMut<ImplTrait>{
-            fn new()->Self{
-
-            }
-        }
 
         impl<ImplTrait: ?Sized> Deref for ObjPtrMut<ImplTrait> {
             type Target = ();
