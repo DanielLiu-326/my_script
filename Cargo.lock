@@ -9,9 +9,6 @@ version = "0.1.0"
 [[package]]
 name = "backend"
 version = "0.1.0"
-dependencies = [
- "vm",
-]
 
 [[package]]
 name = "frontend"
@@ -81,7 +78,3 @@ name = "unicode-ident"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5bd2fe26506023ed7b5e1e315add59d6f584c621d037f9368fea9cfb988f368c"
-
-[[package]]
-name = "vm"
-version = "0.1.0"

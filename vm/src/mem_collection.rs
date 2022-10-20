@@ -1,6 +1,6 @@
 use std::any::Any;
 use std::boxed;
-use std::ops::DerefMut;
+use std::ops::{Deref, DerefMut};
 use super::util;
 use util::data_structure::double_ll::List as DoubleRawList;
 use util::data_structure::double_ll::NodeExt;
@@ -53,6 +53,7 @@ use crate::util::ptr::{Ptr, PtrMut};
 
 
 
+
 use util::ptr::thin_dyn::{Obj,Implemented,ObjPtr};
 use crate::util::ptr::thin_dyn::ObjPtrMut;
 
@@ -74,6 +75,21 @@ impl<Trait:?Sized+std::any::Any+'static> Reference<Trait> {
         return ret;
     }
 }
+
+impl<Trait: ?Sized + std::any::Any + 'static> Deref for Reference<Trait> {
+    type Target = Trait;
+
+    fn deref(&self) -> &Self::Target {
+        self.deref()
+    }
+}
+impl<Trait:?Sized+std::any::Any+'static> DerefMut for Reference<Trait>{
+
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        return self.deref_mut();
+    }
+}
+
 
 
 
