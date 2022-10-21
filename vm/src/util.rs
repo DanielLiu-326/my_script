@@ -35,26 +35,24 @@ pub mod ptr{
         /**
          * 类型
          */
-        pub unsafe trait Implemented:AsRef<Self::ImplTrait>{
-            type ImplTrait:?Sized;
-        }
+        pub unsafe trait Implemented<Trait>:AsRef<Trait>{}
 
         #[repr(C)]
-        pub struct Obj<T:Implemented+Sized> {
-            meta: <T::ImplTrait as std::ptr::Pointee>::Metadata,
+        pub struct Obj<T:Implemented<U>+Sized,U:?Sized> {
+            meta: <U as std::ptr::Pointee>::Metadata,
             data: T,
         }
 
-        impl<T:Implemented+Sized> From<T> for Obj<T>{
+        impl<T:Implemented<U>+Sized,U:?Sized> From<T> for Obj<T,U>{
             fn from(data: T) -> Self {
                 Self{
-                    meta: std::ptr::metadata(data.as_ref() as *const T::ImplTrait),
-                    data: data,
+                    meta: std::ptr::metadata(data.as_ref() as *const U),
+                    data,
                 }
             }
         }
 
-        impl<T:Implemented+Sized> Obj<T> {
+        impl<U:?Sized,T:Implemented<U>> Obj<T,U> {
             pub fn meta(&self)-><T::ImplTrait as std::ptr::Pointee>::Metadata{
                 self.meta
             }

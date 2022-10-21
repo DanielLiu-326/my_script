@@ -1,4 +1,4 @@
-use std::any::Any;
+use std::any::{Any, TypeId};
 use std::boxed;
 use std::ops::{Deref, DerefMut};
 use super::util;
@@ -6,6 +6,9 @@ use util::data_structure::double_ll::List as DoubleRawList;
 use util::data_structure::double_ll::NodeExt;
 use crate::util::data_structure::double_ll::{List, Node, NodeExtraData, NodePtr};
 use crate::util::ptr::{Ptr, PtrMut};
+use util::ptr::thin_dyn::{Obj,Implemented,ObjPtr};
+use crate::util::ptr::thin_dyn::ObjPtrMut;
+
 
 // root                  //child change, self deleted, become not root
 // unstable              //child change，self deleted，become root
@@ -51,44 +54,53 @@ use crate::util::ptr::{Ptr, PtrMut};
 //      }
 // }
 
-
-
-
-use util::ptr::thin_dyn::{Obj,Implemented,ObjPtr};
-use crate::util::ptr::thin_dyn::ObjPtrMut;
-
-pub trait RefObj:Implemented<ImplTrait=Self::Impl>{
-    type Impl:?Sized+std::any::Any+'static;
+pub enum Value{
+    Integer(),
+    Float(),
+    String(),
+    Array(),
+    Reference(),
 }
 
-pub struct Reference<Trait:?Sized+std::any::Any+'static>{
-    inner:ObjPtrMut<Trait>,
+pub trait ReferenceObject:Any{
+    //todo : other functions
+    fn add(&self,other:Value)->Value;
+    fn sub(&self,other:Value)->Value;
+    fn mul(&self,other:Value)->Value;
+    fn div(&self,other:Value)->Value;
 }
 
-impl<Trait:?Sized+std::any::Any+'static> Reference<Trait> {
-    fn new<T: RefObj<Impl = Trait>>(mut obj: Obj<T>) -> Self {
-        let mut obj = Box::new(obj);
-        let ret = Self {
-            inner: obj.trait_ptr_mut(),
-        };
-        std::mem::forget(obj);
-        return ret;
+pub struct Reference{
+    inner:ObjPtrMut<dyn ReferenceObject>,
+}
+
+impl Reference {
+    fn new<T>(mut obj:Obj<T, dyn ReferenceObject>) -> Self
+        where T:Implemented<dyn ReferenceObject>
+    {
+        Self{
+            inner: obj.trait_ptr_mut()
+        }
+    }
+    fn obj_type_id(&self)->TypeId{
+        self.inner.deref().type_id()
     }
 }
 
-impl<Trait: ?Sized + std::any::Any + 'static> Deref for Reference<Trait> {
-    type Target = Trait;
+impl Deref for Reference{
+    type Target = dyn ReferenceObject;
 
     fn deref(&self) -> &Self::Target {
-        self.deref()
+        self.inner.deref()
     }
 }
-impl<Trait:?Sized+std::any::Any+'static> DerefMut for Reference<Trait>{
 
+impl DerefMut for Reference{
     fn deref_mut(&mut self) -> &mut Self::Target {
-        return self.deref_mut();
+        self.inner.deref_mut()
     }
 }
+
 
 
 
