@@ -1,12 +1,8 @@
 use std::any::{Any, TypeId};
-use std::boxed;
 use std::ops::{Deref, DerefMut};
+use std::simd::u16x32;
 use super::util;
-use util::data_structure::double_ll::List as DoubleRawList;
-use util::data_structure::double_ll::NodeExt;
-use crate::util::data_structure::double_ll::{List, Node, NodeExtraData, NodePtr};
-use crate::util::ptr::{Ptr, PtrMut};
-use util::ptr::thin_dyn::{Obj,Implemented,ObjPtr};
+use util::ptr::thin_dyn::{Obj,Implemented};
 use crate::util::ptr::thin_dyn::ObjPtrMut;
 
 
@@ -54,53 +50,204 @@ use crate::util::ptr::thin_dyn::ObjPtrMut;
 //      }
 // }
 
-pub enum Value{
-    Integer(),
-    Float(),
-    String(),
-    Array(),
-    Reference(),
+///
+/// 虚拟机结构：
+/// - 栈
+/// - Self指针寄存器
+/// - 结果寄存器
+/// - 垃圾收集器
+/// - 指令译码器
+/// - 字符串常量表
+/// - 外部对象表
+///
+/// **编址设置**
+///
+///
+/// **虚拟机指针寄存器**
+/// - Ret      函数返回值指针
+/// - StackTop 栈顶指针
+/// - BaseAddr 基地址指针
+/// - PC       程序执行指针
+/// **虚拟机数据寄存器(R[0]~R[256])**
+/// - R[0]         结果寄存器
+/// - R[1]         This指针寄存器
+/// - R[2]         PC指针现场保护
+/// - R[3]         基地址指针现场保护
+/// - R[4]~ R[255] 局部变量寄存器
+/// **实例:**
+/// const func = fn(const a,const b){
+///     return a + b;
+/// }
+/// var c = func(100,200);
+/// **字节码:**
+/// ```
+///
+/// ```
+///
+/// **寄存器内值类型**
+/// - 数据值
+/// - 常量表指针
+/// - 程序计数器指针
+/// - 基地址指针
+/// - 左引用
+/// - 右引用
+/// -
+///
+/// **程序构成部分**
+/// - 常量表:   int,float,String,Array.
+/// -
+/// **程序加载过程**
+/// preload阶段:创建外部调用对象(this指针)，链接符号
+/// load阶段   :
+
+
+type OpReg             = u8;    //寄存器编号类型
+type ConstAddr         = u16;   //常量指针类型
+type RelativeAddr      = u16;   //相对地址类型
+pub struct SegAddr(u8,u8,u8);   //代码段指针类型
+
+pub enum OpCode {
+    /// 运算指令(结果,左操作数,右操作数)
+    Or(OpReg,OpReg,OpReg),
+    And(OpReg,OpReg,OpReg),
+    BitOr(OpReg,OpReg,OpReg),
+    BitXor(OpReg,OpReg,OpReg),
+    BitAnd(OpReg,OpReg,OpReg),
+    NE(OpReg,OpReg,OpReg),
+    EQ(OpReg,OpReg,OpReg),
+    RefEQ(OpReg,OpReg,OpReg),
+    RefNE(OpReg,OpReg,OpReg),
+    LT(OpReg,OpReg,OpReg),
+    GT(OpReg,OpReg,OpReg),
+    LE(OpReg,OpReg,OpReg),
+    GE(OpReg,OpReg,OpReg),
+    RefLT(OpReg,OpReg,OpReg),
+    RefGT(OpReg,OpReg,OpReg),
+    RefLE(OpReg,OpReg,OpReg),
+    RefGE(OpReg,OpReg,OpReg),
+    LMov(OpReg,OpReg,OpReg),
+    RMov(OpReg,OpReg,OpReg),
+    Add(OpReg,OpReg,OpReg),
+    Sub(OpReg,OpReg,OpReg),
+    Mul(OpReg,OpReg,OpReg),
+    Div(OpReg,OpReg,OpReg),
+    Mod(OpReg,OpReg,OpReg),
+    Fact(OpReg,OpReg,OpReg),
+
+    BitNot(OpReg,OpReg),
+    Not(OpReg,OpReg),
+    Neg(OpReg,OpReg),
+    Pos(OpReg,OpReg),
+
+    ///数组操作
+    ArrayVisit(OpReg),
+
+    /// 寄存器赋值指令
+    RefAssign(OpReg,OpReg),
+    ValAssign(OpReg,OpReg),
+
+    MovConst0(OpReg,ConstAddr), //从常量区0加载数据
+    MovConst1(OpReg,ConstAddr), //从常量区1加载数据
+    MovConst2(OpReg,ConstAddr), //从常量区2加载数据
+    MovConst3(OpReg,ConstAddr), //从常量区3加载数据
+
+    MemVisit(OpReg,ConstAddr),  //成员访问运算
+
+    //相对跳跃，一次最多跳524280条指令,一个段最多有6553500条指令,最多有6553500个段
+    JmpIfPrev0(OpReg,u16),
+    JmpIfPrev1(OpReg,u16),
+    JmpIfPrev2(OpReg,u16),
+    JmpIfPrev3(OpReg,u16),
+
+    JmpIfPost0(OpReg,u16),
+    JmpIfPost1(OpReg,u16),
+    JmpIfPost2(OpReg,u16),
+    JmpIfPost3(OpReg,u16),
+
+
+
+    Push(u16),                   //压入n个值
+    Pop(u16),                    //弹出n个值
+
+
+    ///函数调用
+    /// - 压入PC寄存器
+    /// - 压入基地址寄存器
+    /// - 将基地址设置为栈顶-4
+    Call(u8),
+    CallConst0(ConstAddr),      //调用Const函数
+
+    Ret,                         //弹出到基地址寄存器，弹出到程序计数器
+
+
 }
 
-pub trait ReferenceObject:Any{
-    //todo : other functions
-    fn add(&self,other:Value)->Value;
-    fn sub(&self,other:Value)->Value;
-    fn mul(&self,other:Value)->Value;
-    fn div(&self,other:Value)->Value;
-}
 
-pub struct Reference{
-    inner:ObjPtrMut<dyn ReferenceObject>,
-}
-
-impl Reference {
-    fn new<T>(mut obj:Obj<T, dyn ReferenceObject>) -> Self
-        where T:Implemented<dyn ReferenceObject>
-    {
-        Self{
-            inner: obj.trait_ptr_mut()
+impl OpCode{
+    #[inline(always)]
+    pub fn get_u24(&self) ->u32 {
+        unsafe {
+            *(self as *const u32) & 0x00_ff_ff_ff
         }
     }
-    fn obj_type_id(&self)->TypeId{
-        self.inner.deref().type_id()
+
+    #[inline(always)]
+    pub fn get_uncut(&self) ->u32 {
+        unsafe{
+            *(self as *const u32)
+        }
     }
+
+    #[inline(always)]
+    pub fn set_u24(&mut self,val:u32){
+        unsafe{
+            *(self as *mut u32) |= val;
+        }
+    }
+
 }
 
-impl Deref for Reference{
-    type Target = dyn ReferenceObject;
 
-    fn deref(&self) -> &Self::Target {
-        self.inner.deref()
-    }
+///所有可能出现的类型组合
+pub enum RegValue{
+    ///未装箱的类型S
+
+    ConstBool(),
+    ConstInteger(),
+    ConstFloat(),
+
+    VarBool(),
+    VarInteger(),
+    VarFloat(),
+
+    ///已经被装箱的类型.
+
+    VarRefBool(),
+    VarRefInteger(),
+    VarRefFloat(),
+
+    ConstRefBool(),
+    ConstRefInteger(),
+    ConstRefFloat(),
+
+    /// 自身本来就是引用类型的类型。
+
+    VarString(),
+    VarArray(),
+    VarDict(),
+    VarFunc(),
+    VarStruct(),
+
+    ConstString(),
+    ConstArray(),
+    ConstDict(),
+    ConstFunc(),
+    ConstStruct(),
+
+    ConstNil(),
+    StaticNil(),
+    Undefined,
 }
-
-impl DerefMut for Reference{
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.inner.deref_mut()
-    }
-}
-
 
 
 

@@ -6,6 +6,7 @@
       <sourceFolder url="file://$MODULE_DIR$/backend/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/backend/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/backend/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/util/linked_list/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/vm/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/vm/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/vm/src" isTestSource="false" />
@@ -24,6 +25,7 @@
       <excludeFolder url="file://$MODULE_DIR$/backend/target" />
       <excludeFolder url="file://$MODULE_DIR$/backend/vm/target" />
       <excludeFolder url="file://$MODULE_DIR$/vm/target" />
+      <excludeFolder url="file://$MODULE_DIR$/util/linked_list/target" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
