@@ -140,18 +140,41 @@ pub enum OpCode {
     Pos(OpReg,OpReg),
 
     ///数组操作
-    ArrayVisit(OpReg),
+    IndexVisit(OpReg,OpReg),
 
-    /// 寄存器赋值指令
-    RefAssign(OpReg,OpReg),
-    ValAssign(OpReg,OpReg),
+    ///结构体成员访问
+    MemberVisit(OpReg,OpReg,OpReg),
 
+    ///
+    /// 变量创建
+    ///
+
+
+    //加载常量,String,Integer,Function
     MovConst0(OpReg,ConstAddr), //从常量区0加载数据
     MovConst1(OpReg,ConstAddr), //从常量区1加载数据
     MovConst2(OpReg,ConstAddr), //从常量区2加载数据
     MovConst3(OpReg,ConstAddr), //从常量区3加载数据
 
-    MemVisit(OpReg,ConstAddr),  //成员访问运算
+    //创建内嵌式Bool
+    LoadTrue(OpReg),
+    LoadFalse(OpReg),
+
+    //创建内嵌式整数 -65535~65535
+    LoadPosShort(OpReg,u16),
+    LoadNegShort(OpReg,u16),
+
+    //创建数组
+    LoadNewArray(OpReg,u16),	//存储寄存器，初始大小
+
+    //创建结构体
+    LoadStruct(OpReg),
+
+    //创建闭包，添加捕获变量
+    CapVariable(OpReg,OpReg),
+
+    //创建Nil
+    LoadNil(OpReg),
 
     //相对跳跃，一次最多跳524280条指令,一个段最多有6553500条指令,最多有6553500个段
     JmpIfPrev0(OpReg,u16),
@@ -163,6 +186,7 @@ pub enum OpCode {
     JmpIfPost1(OpReg,u16),
     JmpIfPost2(OpReg,u16),
     JmpIfPost3(OpReg,u16),
+
 
 
 
@@ -210,43 +234,40 @@ impl OpCode{
 
 ///所有可能出现的类型组合
 pub enum RegValue{
-    ///未装箱的类型S
+    ///未装箱的基本类型
+    InlineInteger(i64),
+    InlineBool(bool),
+    InlineFloat(f64),
 
-    ConstBool(),
-    ConstInteger(),
-    ConstFloat(),
+    ///已经装箱的基本类型
+    RefInteger(Ptr),
+    RefBool(Ptr),
+    RefFloat(Ptr),
 
-    VarBool(),
-    VarInteger(),
-    VarFloat(),
+    ConstRefInteger(Ptr),
+    ConstRefBool(Ptr),
+    ConstRefFloat(Ptr),
 
-    ///已经被装箱的类型.
+    ///对象类型
+    RefArray(Ptr),
+    RefDict(Ptr),
+    RefStruct(Ptr),
+    RefFunction(Ptr),
 
-    VarRefBool(),
-    VarRefInteger(),
-    VarRefFloat(),
+    ConstRefArray(Ptr),
+    ConstRefDict(Ptr),
+    ConstRefStruct(Ptr),
+    ConstRefFunction(Ptr),
 
-    ConstRefBool(),
-    ConstRefInteger(),
-    ConstRefFloat(),
+    ///Load const指令加载的常量类型
+    ConstInteger(i64),
+    ConstBool(bool),
+    ConstFloat(i64),
+    ConstString(Ptr),
 
-    /// 自身本来就是引用类型的类型。
+    RefNil,
+    ConstRefNil,
 
-    VarString(),
-    VarArray(),
-    VarDict(),
-    VarFunc(),
-    VarStruct(),
-
-    ConstString(),
-    ConstArray(),
-    ConstDict(),
-    ConstFunc(),
-    ConstStruct(),
-
-    ConstNil(),
-    StaticNil(),
-    Undefined,
 }
 
 
