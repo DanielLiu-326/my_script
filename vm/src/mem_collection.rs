@@ -139,22 +139,33 @@ pub enum OpCode {
     Neg(OpReg,OpReg),
     Pos(OpReg,OpReg),
 
-    ///数组操作
-    IndexVisit(OpReg,OpReg),
+    ///数组访问操作
+    ArrayVisit(OpReg,OpReg,OpReg), //(存储结果的寄存器,数组所在的寄存器,index)
 
-    ///结构体成员访问
-    MemberVisit(OpReg,OpReg,OpReg),
+    ///结构体成员访问操作
+    MemberGet(OpReg,OpReg,OpReg), //(存储结果的寄存器，struct所在寄存器，成员ident字符串常量)
+    MemberSet(OpReg,OpReg,OpReg), //(struct所在的寄存器,成员ident字符串常量,设置的值所在的寄存器)
 
-    ///
+    ///赋值操作
+    RefAssign(OpReg,OpReg),       //引用赋值
+    ValAssign(OpReg,OpReg),       //值赋值
+
+
     /// 变量创建
-    ///
 
 
-    //加载常量,String,Integer,Function
+    //加载为常量,String,Integer,Function
     MovConst0(OpReg,ConstAddr), //从常量区0加载数据
     MovConst1(OpReg,ConstAddr), //从常量区1加载数据
     MovConst2(OpReg,ConstAddr), //从常量区2加载数据
     MovConst3(OpReg,ConstAddr), //从常量区3加载数据
+
+    //加载变量，成为变量
+    LoadFromConst0(OpReg,ConstAddr),    //从常量区0加载数据
+    LoadFromConst1(OpReg,ConstAddr),    //从常量区1加载数据
+    LoadFromConst2(OpReg,ConstAddr),    //从常量区2加载数据
+    LoadFromConst3(OpReg,ConstAddr),    //从常量区3加载数据
+
 
     //创建内嵌式Bool
     LoadTrue(OpReg),
@@ -165,13 +176,14 @@ pub enum OpCode {
     LoadNegShort(OpReg,u16),
 
     //创建数组
-    LoadNewArray(OpReg,u16),	//存储寄存器，初始大小
+    LoadNewArray(OpReg,u16),	    //存储寄存器，初始大小
 
     //创建结构体
     LoadStruct(OpReg),
+    InitMember(OpReg,OpReg,OpReg),
 
     //创建闭包，添加捕获变量
-    CapVariable(OpReg,OpReg),
+    CapValue(OpReg,OpReg,OpReg),
 
     //创建Nil
     LoadNil(OpReg),
@@ -188,12 +200,6 @@ pub enum OpCode {
     JmpIfPost3(OpReg,u16),
 
 
-
-
-    Push(u16),                   //压入n个值
-    Pop(u16),                    //弹出n个值
-
-
     ///函数调用
     /// - 压入PC寄存器
     /// - 压入基地址寄存器
@@ -201,12 +207,8 @@ pub enum OpCode {
     Call(u8),
     CallConst0(ConstAddr),      //调用Const函数
 
-    Ret,                         //弹出到基地址寄存器，弹出到程序计数器
-
-
+    Ret,                        //弹出到基地址寄存器，弹出到程序计数器
 }
-
-
 impl OpCode{
     #[inline(always)]
     pub fn get_u24(&self) ->u32 {
@@ -226,10 +228,14 @@ impl OpCode{
     pub fn set_u24(&mut self,val:u32){
         unsafe{
             *(self as *mut u32) |= val;
+            let a:isize = 1;
+            let b:usize = 1;
+            std::ptr::copy(&mut a as *mut i32,),
         }
     }
-
 }
+
+
 
 
 ///所有可能出现的类型组合
@@ -240,8 +246,8 @@ pub enum RegValue{
     InlineFloat(f64),
 
     ///已经装箱的基本类型
-    RefInteger(Ptr),
-    RefBool(Ptr),
+    RefInteger(),
+    RefBool(*const ()),
     RefFloat(Ptr),
 
     ConstRefInteger(Ptr),
