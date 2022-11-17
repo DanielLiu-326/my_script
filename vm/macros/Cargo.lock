@@ -3,22 +3,12 @@
 version = 3
 
 [[package]]
-name = "linked_list"
-version = "0.1.0"
-
-[[package]]
 name = "macros"
 version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "syn",
 ]
-
-[[package]]
-name = "paste"
-version = "1.0.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1de2e551fb905ac83f73f7aedf2f0cb4a0da7e35efa24a202a936269f1f18e1"
 
 [[package]]
 name = "proc-macro2"
@@ -54,12 +44,3 @@ name = "unicode-ident"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ceab39d59e4c9499d4e5a8ee0e2735b891bb7308ac83dfb4e80cad195c9f6f3"
-
-[[package]]
-name = "vm"
-version = "0.1.0"
-dependencies = [
- "linked_list",
- "macros",
- "paste",
-]

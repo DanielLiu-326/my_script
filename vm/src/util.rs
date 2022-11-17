@@ -4,8 +4,24 @@ use std::ffi::c_void;
 use std::fmt::{Debug, Formatter};
 use std::mem::size_of;
 
-#[inline]
-pub fn allocate(size: usize) -> *mut c_void {
+#[inline(always)]
+pub fn allocate_value<T>(val:T) -> *mut T {
+    unsafe {
+        let p_val = allocate::<T>();
+        *p_val = val;
+        return p_val;
+    }
+}
+
+#[inline(always)]
+pub fn allocate<T>() -> *mut T {
+    unsafe {
+        allocate_raw(size_of::<T>()).cast()
+    }
+}
+
+#[inline(always)]
+pub fn allocate_raw(size: usize) -> *mut c_void {
     unsafe {
         let allocated = alloc::alloc(
             Layout::from_size_align(size + size_of::<usize>(),
@@ -18,6 +34,8 @@ pub fn allocate(size: usize) -> *mut c_void {
         allocated.add(1).cast()
     }
 }
+
+
 #[inline]
 pub fn deallocate(ptr: *mut c_void) {
     unsafe {
