@@ -3,39 +3,94 @@
 use crate::mem_collection::{RefConst, RefCount};
 use paste::paste;
 use std::mem::size_of;
-use std::ops::{Add, Sub};
 use std::process::Output;
 use std::ptr::NonNull;
 use crate::util::allocate;
 use macros::match_2_value ;
 
+///所有在寄存器可能出现的类型组合
+pub enum Value {
+    ///未装箱的基本类型
+    InlineInteger(Integer),
+    InlineFloat  (Float),
+    InlineBool   (Bool),
 
-macro_rules! enum_vals {
-    () => {
-        InlineInteger,InlineBool,InlineFloat,RefInteger,
-        RefBool,RefFloat,ConstRefInteger,ConstRefBool,
-        ConstRefFloat,ConstInteger,ConstBool,
-        ConstFloat,RefNil,ConstRefNil
-    };
+    ///已经装箱的基本类型
+    RefInteger   (RefInteger),
+    RefFloat     (RefFloat),
+    RefBool      (RefBool),
+
+    ConstRefInteger (RefConstInteger),
+    ConstRefFloat   (RefConstFloat),
+    ConstRefBool    (RefConstBool),
+
+
+    ///对象类型
+    // RefArray(Array),
+    // RefDict(Ptr),
+    // RefStruct(Ptr),
+    // RefFunction(Ptr),
+
+    // ConstRefArray(ArrayObject),
+    // ConstRefDict(Ptr),
+    // ConstRefStruct(Ptr),
+    // ConstRefFunction(Ptr),
+
+    ///Load const指令加载的常量类型
+    ConstInteger(Integer),
+    ConstBool(Bool),
+    ConstFloat(Float),
+    // ConstString(String),
+
+    RefNil(()),
+    ConstRefNil(()),
 }
+
+impl Default for Value{
+    fn default() -> Self {
+        Self::RefNil(())
+    }
+}
+
+pub trait Unbox{
+    type Output:Copy;
+
+    fn unbox(&self) -> Self::Output;
+}
+
+type Integer    = i64;
+type Float      = f64;
+type Bool       = bool;
+
+type RefInteger = RefCount<i64>;
+type RefFloat   = RefCount<f64>;
+type RefBool    = RefCount<bool>;
+
+type RefConstInteger = RefConst<i64>;
+type RefConstFloat   = RefConst<f64>;
+type RefConstBool    = RefConst<bool>;
 
 macro_rules! def_binary_op_trait {
     ($trait_name:ident,$fn_name:ident) => {
-        pub trait $trait_name<T,U> {
-            fn $fn_name(&self,value:T)->U{
+        pub trait $trait_name<T> {
+            #[inline(always)]
+            fn $fn_name(&self,other:T) -> Value{
                 unimplemented!()
             }
         }
+        impl<T,U> $trait_name<U> for T{}
     };
 }
 
 macro_rules! def_unary_op_trait {
     ($trait_name:ident,$fn_name:ident) => {
-        pub trait $trait_name<U> {
-            fn $fn_name(&self)->U{
+        pub trait $trait_name {
+            #[inline(always)]
+            fn $fn_name(&self)->Value{
                 unimplemented!()
             }
         }
+        impl<T> $trait_name for T{}
     };
 }
 
@@ -76,71 +131,19 @@ pub trait AssignVal<T>{
     }
 }
 
-
-///所有在寄存器可能出现的类型组合
-pub enum Value {
-    ///未装箱的基本类型
-    InlineInteger(Integer),
-    InlineBool   (Bool),
-    InlineFloat  (Float),
-
-    ///已经装箱的基本类型
-    RefInteger   (RefInteger),
-    RefBool      (RefBool),
-    RefFloat     (RefFloat),
-
-    ConstRefInteger (RefConstInteger),
-    ConstRefBool    (RefConstBool),
-    ConstRefFloat   (RefConstFloat),
-
-
-    ///对象类型
-    // RefArray(Array),
-    // RefDict(Ptr),
-    // RefStruct(Ptr),
-    // RefFunction(Ptr),
-
-    // ConstRefArray(ArrayObject),
-    // ConstRefDict(Ptr),
-    // ConstRefStruct(Ptr),
-    // ConstRefFunction(Ptr),
-
-    ///Load const指令加载的常量类型
-    ConstInteger(Integer),
-    ConstBool(Bool),
-    ConstFloat(Float),
-    // ConstString(String),
-
-    RefNil(()),
-    ConstRefNil(()),
+macro_rules! def_binary_value_op {
+    ($a:ident,$b:ident,$stmt:stmt) => {
+        paste
+        match_2_value!({a.add(b)},InlineInteger,InlineFloat,InlineBool,
+            RefInteger,RefFloat,RefBool,
+            ConstRefInteger,ConstRefFloat,ConstRefBool,
+            ConstInteger,ConstFloat,ConstBool,
+            RefNil,ConstRefNil);
+    };
 }
 
-
-#[inline(always)]
-pub fn add(left:&Value,right:&Value)->Value{
-    let a = match_2_value!((left,right),a+b,enum_vals!());
+#[inline]
+pub fn add(a:&Value,b:&Value){
+    let mut a = def_binary_value_op!(a,b,a.add(b));
+    ;
 }
-
-impl Default for Value{
-    fn default() -> Self {
-        Self::RefNil(())
-    }
-}
-
-pub trait Unbox{
-    type Output:Copy;
-
-    fn unbox(&self) -> Self::Output;
-}
-
-type Integer    = i64;
-type Float      = f64;
-type Bool       = bool;
-
-type RefInteger = RefCount<i64>;
-type RefFloat   = RefCount<f64>;
-type RefBool    = RefCount<bool>;
-
-type RefConstInteger = RefConst<i64>;
-type RefConstFloat   = RefConst<f64>;
-type RefConstBool    = RefConst<bool>;
