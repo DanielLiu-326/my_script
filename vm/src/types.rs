@@ -1,28 +1,309 @@
 use std::arch::x86_64::_xabort;
-use std::cell::UnsafeCell;
+use std::cell::{RefMut, UnsafeCell};
 use std::fmt::{Debug, Formatter};
 use std::mem::Discriminant;
 use std::net::IpAddr;
-use std::simd::{Simd, usizex2};
+use std::ops::{Deref, DerefMut};
+use std::process::Output;
 use crate::mem_collection::{Addr, RefAddr, RefConst, RefCount};
 use paste::paste;
 use macros::{define_val, impl_default, impl_op, match_1_value, match_2_values, op_define};
 
 
-type Integer    = i64;
+///
+/// Value Types
+///
 
-type Float      = f64;
+pub type Integer    = i64;
 
-type Bool       = bool;
+pub type Float      = f64;
 
+pub type Bool       = bool;
+
+pub struct Nil();
+
+#[val_define]
 pub enum Value{
     Integer(Integer),
     Float(Float),
     Bool(Bool),
+    Nil(Nil),
 }
 
+///
+/// Variability
+///
+
+pub struct UncheckMut<T>(UnsafeCell<T>);
+
+impl<T> UncheckMut<T> {
+    #[inline(always)]
+    fn ref_mut(&self)->Mutable<'_,T>{unsafe{
+        (&mut *self.0.get()).into()
+    }}
+}
+
+pub struct Immutable<'a,T>(&'a T);
+
+impl<'a,T> Into<Immutable<'a,T>> for &'a T{
+    fn into(self) -> Immutable<'a, T> {
+        Immutable::from(self)
+    }
+}
+
+impl<'a,T> From<&'a T> for Immutable<'a,T>{
+    fn from(val: &'a T) -> Self {
+        Self(val)
+    }
+}
+
+pub struct Mutable<'a,T>(&'a mut T);
+
+impl<'a,T> Into<Mutable<'a,T>> for &'a mut T{
+    fn into(self) -> Mutable<'a, T> {
+        Mutable::from(self)
+    }
+}
+
+impl<'a,T> From<&'a mut T> for Mutable<'a,T>{
+    fn from(val: &'a mut T) -> Self {
+        Self(val)
+    }
+}
+
+///
+/// Register Types
+///
+
+pub trait RegTy{
+    type Output;
+    fn unbox(&self) -> Self::Output;    //unbox the reference into the type that can be operatee.
+}
+
+
+#[ref_define]
+pub enum RegType {
+    /// 内联可变变量
+    InlineInteger(InlineInteger),
+    InlineFloat  (InlineFloat),
+    InlineBool   (InlineBool),
+
+    /// 内联不可变变量
+    ConstInlineInteger  (ConstInlineInteger),
+    ConstInlineFloat    (ConstInlineFloat),
+    ConstInlineBool     (ConstInlineBool),
+
+    /// 可变引用
+    RefInteger   (RefInteger),
+    RefFloat     (RefFloat),
+    RefBool      (RefBool),
+
+    /// 不可变引用
+    ConstRefInteger (ConstRefInteger),
+    ConstRefFloat   (ConstRefFloat),
+    ConstRefBool    (ConstRefBool),
+
+
+    ///对象类型
+    // RefArray(Array),
+    // RefDict(Ptr),
+    // RefStruct(Ptr),
+    // RefFunction(Ptr),
+
+    // ConstRefArray(ArrayObject),
+    // ConstRefDict(Ptr),
+    // ConstRefStruct(Ptr),
+    // ConstRefFunction(Ptr),
+
+    /// 常量
+    ConstInteger(ConstInteger),
+    ConstFloat  (ConstFloat),
+    ConstBool   (ConstBool),
+    // ConstString(String),
+
+    /// NIL
+    RefNil      (RefNil),
+    ConstRefNil (ConstRefNil),
+}
+
+pub struct InlineInteger(UncheckMut<Integer>);
+
+impl RegTy for InlineInteger{
+    type Output = Mutable<'_,Integer>;
+
+    fn unbox(&self) -> Self::Output {
+        self.0.ref_mut()
+    }
+}
+
+pub struct InlineFloat(UncheckMut<Float>);
+
+impl RegTy for InlineFloat{
+    type Output = Mutable<'_,Float>;
+
+    fn unbox(&self) -> Self::Output {
+        self.0.ref_mut()
+    }
+}
+
+pub struct InlineBool(UncheckMut<Bool>);
+
+impl RegTy for InlineBool{
+    type Output = Mutable<'_,Bool>;
+
+    fn unbox(&self) -> Self::Output {
+        self.0.ref_mut()
+    }
+}
+
+pub struct ConstInlineInteger(Integer);
+
+impl RegTy for ConstInlineInteger{
+    type Output = Immutable<'_,Integer>;
+
+    fn unbox(&self) -> Self::Output {
+        (&self.0).into()
+    }
+}
+
+pub struct ConstInlineFloat(Float);
+
+impl RegTy for ConstInlineFloat{
+    type Output = Immutable<'_,Float>;
+
+    fn unbox(&self) -> Self::Output {
+        (&self.0).into()
+    }
+}
+
+pub struct ConstInlineBool(Bool);
+
+impl RegTy for ConstInlineBool{
+    type Output = Immutable<'_,Bool>;
+
+    fn unbox(&self) -> Self::Output {
+        (&self.0).into()
+    }
+}
+
+pub struct RefInteger(UncheckMut<RefCount<Integer>>);
+
+impl RegTy for RefInteger{
+    type Output = Mutable<'_,Integer>;
+
+    fn unbox(&self) -> Self::Output {
+        &mut **self.0.ref_mut()
+    }
+}
+
+pub struct RefFloat(UncheckMut<RefCount<Float>>);
+
+impl RegTy for RefFloat{
+    type Output = Mutable<'_,Float>;
+
+    fn unbox(&self) -> Self::Output {
+        &mut **self.0.ref_mut()
+    }
+}
+
+pub struct RefBool(UncheckMut<RefCount<Bool>>);
+
+impl RegTy for RefBool{
+    type Output = Mutable<'_,Bool>;
+
+    fn unbox(&self) -> Self::Output {
+        &mut **self.0.ref_mut()
+    }
+}
+
+pub struct ConstRefInteger(RefCount<Integer>);
+
+impl RegTy for ConstRefInteger{
+    type Output = Immutable<'_,Integer>;
+
+    fn unbox(&self) -> Self::Output {
+        (&*self.0).into()
+    }
+}
+
+pub struct ConstRefFloat(RefCount<Float>);
+
+impl RegTy for ConstRefFloat{
+    type Output = Immutable<'_,Float>;
+
+    fn unbox(&self) -> Self::Output {
+        (&*self.0).into()
+    }
+}
+
+pub struct ConstRefBool(RefCount<Bool>);
+
+impl RegTy for ConstRefBool{
+    type Output = Immutable<'_,Bool>;
+
+    fn unbox(&self) -> Self::Output {
+        (&*self.0).into()
+    }
+}
+
+pub struct ConstInteger(RefCount<Integer>);
+
+impl RegTy for ConstInteger{
+    type Output = Immutable<'_,Integer>;
+
+    fn unbox(&self) -> Self::Output {
+        (&*self.0).into()
+    }
+}
+
+pub struct ConstFloat(RefCount<Float>);
+
+impl RegTy for ConstFloat{
+    type Output = Immutable<'_,Float>;
+
+    fn unbox(&self) -> Self::Output {
+        (& *self.0).into()
+    }
+}
+
+pub struct ConstBool(RefCount<Bool>);
+
+impl RegTy for ConstBool{
+    type Output = Immutable<'_,Bool>;
+
+    fn unbox(&self) -> Self::Output {
+        (& *self.0).into()
+    }
+}
+
+pub struct RefNil(UncheckMut<Nil>);
+
+impl RegTy for RefNil{
+    type Output = Mutable<'_,Nil>;
+
+    fn unbox(&self) -> Self::Output {
+        self.0.ref_mut()
+    }
+}
+
+pub struct ConstRefNil(Nil);
+
+impl RegTy for ConstRefNil{
+    type Output = Immutable<'_,Nil>;
+
+    fn unbox(&self) -> Self::Output {
+        (&self.0).into()
+    }
+}
+
+
+
+///
+/// Operators
+///
+
 macro_rules! def_binary_op_trait {
-    ($trait_name:ident,$fn_name:ident) => {paste!{
+    ($trait_name:ident,) => {paste!{
         #[op_define]
         pub trait $trait_name<T> {
             fn $fn_name(&self,_other:&T) -> Value;
@@ -50,9 +331,9 @@ macro_rules! def_unary_op_trait {
     }}
 }
 
-///
-/// # Binary Ops
-///
+//
+// Binary Ops
+//
 
 def_binary_op_trait!(OpOr,       op_or);
 def_binary_op_trait!(OpAnd,      op_and);
@@ -74,12 +355,19 @@ def_binary_op_trait!(OpDiv,      op_div);
 def_binary_op_trait!(OpMod,      op_mod);
 def_binary_op_trait!(OpFact,     op_fact);
 
-def_binary_op_trait!(OpAssign,    op_assign);
+pub trait OpValAssign{
+    fn op_val_assign(&mut self) {
 
+    }
+}
 
-///
-/// # Unary Ops
-///
+pub fn op_val_assign(a:&Value,b:&Value){
+    match_2_same_value!();
+}
+
+//
+// Unary Ops
+//
 
 def_unary_op_trait!(OpBitNot,    op_bit_not);
 def_unary_op_trait!(OpNot,       op_not);
@@ -88,124 +376,11 @@ def_unary_op_trait!(OpPos,       op_pos);
 
 
 
-pub trait Ref{
-    type Output;
-    fn unbox(&self) -> &mut Self::Output;    //unbox the reference into the type that can be operatee.
+#[inline(always)]
+pub fn op_assign_val<T>(a:&Value,b:&Value) -> Value{
+    return match_2_values!((a,b),{a.unbox().op_assign_val(b.unbox)})
 }
 
-pub struct InlineInteger(UnsafeCell<Integer>);
-
-impl Ref for InlineInteger{
-    type Output = Integer;
-
-    fn unbox(&self) -> &mut Self::Output {
-        self.0
-    }
-}
-
-pub struct InlineFloat(Float);
-
-impl Ref for InlineFloat{
-    type Output = Float;
-
-    fn unbox(&self) -> Self::Output {
-        self.0
-    }
-}
-
-pub struct InlineBool(Bool);
-
-impl Ref for InlineBool{
-    type Output = Bool;
-
-    fn unbox(&self) -> Self::Output {
-        self.0
-    }
-}
-
-pub struct ConstInlineInteger(Integer);
-
-impl Ref for ConstInlineInteger{
-    type Output = Integer;
-
-    fn unbox(&self) -> Self::Output {
-        self.0
-    }
-}
-
-pub struct ConstInlineFloat(Float);
-
-impl Ref for ConstInlineFloat{
-    type Output = Float;
-
-    fn unbox(&self) -> Self::Output {
-        self.0
-    }
-}
-
-pub struct ConstInlineBool(Bool);
-
-impl Ref for ConstInlineBool{
-    type Output = Bool;
-
-    fn unbox(&self) -> Self::Output {
-        self.0
-    }
-}
-
-pub struct RefInteger(RefCount<Integer>);
-
-impl Ref for ConstInlineInteger{
-    type Output = Integer;
-
-    fn unbox(&self) -> Self::Output {
-        **self
-    }
-}
-
-pub enum Reference{
-    /// 内联可变变量
-    InlineInteger(Integer),
-    InlineFloat  (Float),
-    InlineBool   (Bool),
-
-    /// 内联不可变变量
-    ConstInlineInteger  (Integer),
-    ConstInlineFloat    (Float),
-    ConstInlineBool     (Bool),
-
-    /// 可变引用
-    RefInteger   (RefInteger),
-    RefFloat     (RefFloat),
-    RefBool      (RefBool),
-
-    /// 不可变引用
-    ConstRefInteger (RefConstInteger),
-    ConstRefFloat   (RefConstFloat),
-    ConstRefBool    (RefConstBool),
-
-
-    ///对象类型
-    // RefArray(Array),
-    // RefDict(Ptr),
-    // RefStruct(Ptr),
-    // RefFunction(Ptr),
-
-    // ConstRefArray(ArrayObject),
-    // ConstRefDict(Ptr),
-    // ConstRefStruct(Ptr),
-    // ConstRefFunction(Ptr),
-
-    /// 常量
-    ConstInteger(Integer),
-    ConstBool(Bool),
-    ConstFloat(Float),
-    // ConstString(String),
-
-    /// NIL
-    RefNil(()),
-    ConstRefNil(()),
-}
 
 
 
@@ -241,174 +416,6 @@ impl Const{
         }
     }
 }
-
-///所有在寄存器可能出现的类型组合
-#[define_val]
-#[derive(Debug)]
-pub enum Value {
-    /// 内联可变变量
-    InlineInteger(Integer),
-    InlineFloat  (Float),
-    InlineBool   (Bool),
-
-    /// 内联不可变变量
-    ConstInlineInteger  (Integer),
-    ConstInlineFloat    (Float),
-    ConstInlineBool     (Bool),
-
-    /// 可变引用
-    RefInteger   (RefInteger),
-    RefFloat     (RefFloat),
-    RefBool      (RefBool),
-
-    /// 不可变引用
-    ConstRefInteger (RefConstInteger),
-    ConstRefFloat   (RefConstFloat),
-    ConstRefBool    (RefConstBool),
-
-
-    ///对象类型
-    // RefArray(Array),
-    // RefDict(Ptr),
-    // RefStruct(Ptr),
-    // RefFunction(Ptr),
-
-    // ConstRefArray(ArrayObject),
-    // ConstRefDict(Ptr),
-    // ConstRefStruct(Ptr),
-    // ConstRefFunction(Ptr),
-
-    /// 常量
-    ConstInteger(Integer),
-    ConstBool(Bool),
-    ConstFloat(Float),
-    // ConstString(String),
-
-    /// NIL
-    RefNil(()),
-    ConstRefNil(()),
-}
-
-pub enum RefCompare{
-    ConstInteger(Integer),
-    ConstFloat(Float),
-    ConstBool(Bool),
-    MemAddr(RefAddr),
-    InlineValue,
-    Nil(),
-}
-
-impl Value{
-
-    pub fn ref_addr(&self) -> Option<usizex2>{
-        match self{
-            Value::InlineInteger(_) => {Option::None}
-            Value::InlineFloat(_) => {Option::None}
-            Value::InlineBool(_) => {Option::None}
-            Value::ConstInlineInteger(_) => {Option::None}
-            Value::ConstInlineFloat(_) => {Option::None}
-            Value::ConstInlineBool(_) => {Option::None}
-            Value::RefInteger(a) => {Option::Some(a.ref_addr().into())}
-            Value::RefFloat(a) => {Option::Some(a.ref_addr().into())}
-            Value::RefBool(a) => {Option::Some(a.ref_addr().into())}
-            Value::ConstRefInteger(a) => {Option::Some(a.ref_addr().into())}
-            Value::ConstRefFloat(a) => {Option::Some(a.ref_addr().into())}
-            Value::ConstRefBool(a) => {Option::Some(a.ref_addr().into())}
-            Value::ConstInteger(_) => {Option::Some()}
-            Value::ConstBool(_) => {}
-            Value::ConstFloat(_) => {}
-            Value::RefNil(_) => {}
-            Value::ConstRefNil(_) => {}
-        }
-    }
-}
-
-impl Default for Value{
-    fn default() -> Self {
-        Self::RefNil(())
-    }
-}
-
-/// Unbox a type into the operatee type
-/// - every type should implement Unbox as inline functions. if the type is operatee type,just
-/// implement it by make Output Type.
-/// - all operatee types should define the operations that they can do. and
-pub trait Unbox {
-    type Output;
-    fn unbox(&self) -> &Self::Output;
-}
-
-
-
-
-
-
-impl<T:Copy> Unbox for T {
-    type Output = T;
-
-    fn unbox(&self) -> &T {
-        self
-    }
-}
-
-impl<T:Copy> Unbox for RefCount<T>{
-    type Output = T;
-
-    fn unbox(&self) -> &Self::Output {
-        &**self
-    }
-}
-
-impl<T:Copy> Unbox for RefConst<T>{
-    type Output = T;
-
-    fn unbox(&self) -> &Self::Output {
-        &**self
-    }
-}
-
-
-
-
-
-
-impl Debug for RefInteger{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ref {}",**self)
-    }
-}
-
-impl Debug for RefFloat{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ref {}",**self)
-    }
-}
-
-impl Debug for RefBool{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ref {}",**self)
-    }
-}
-
-impl Debug for RefConstInteger{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ref {}",**self)
-    }
-}
-
-impl Debug for RefConstFloat{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ref const {}",**self)
-    }
-}
-
-impl Debug for RefConstBool{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ref const {}",**self)
-    }
-}
-
-
 
 /// **************************************** Op Implementations ****************************************
 
@@ -652,9 +659,3 @@ impl_default!(
     OpPos   => {unimplemented!()}
 );
 
-pub fn op_ref_eq(a:&Value,b:&Value) -> Value{
-
-}
-pub fn op_ref_ne(a:&Value,b:&Value) -> Value{
-
-}

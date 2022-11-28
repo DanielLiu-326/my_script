@@ -8,19 +8,18 @@ use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use syn::__private::ToTokens;
 use convert_case::{Case, Casing};
-/// Value Type
-///     Bool
-///     Integer
-///     Float
-///     Inline String
 
-/// Register Type
-///     InlineMutRef
-///     InlineConstRef
-///     RefCount
-///
-///
-///
+static mut VAL_TAGS     : Option<Vec<String>> = None;
+
+static mut REF_TAGS     : Option<Vec<String>> = None;
+
+static mut REF_TYPES    : Option<Vec<String>> = None;
+
+static mut BINARY_OPS   : Option<Vec<String>> = None;
+
+static mut UNARY_OPS    : Option<Vec<String>> = None;
+
+
 
 
 // the value name
