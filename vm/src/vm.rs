@@ -1,19 +1,23 @@
+use std::ops::{Deref, DerefMut};
+use crate::const_table::ConstTable;
 use crate::opcode::OpCode;
 use crate::stack::VmStack;
-use crate::types::Value;
+use crate::types::*;
 
-pub struct VM{
+pub struct VM {
     stack:VmStack,
     pc:usize,
     op_codes:Vec<OpCode>,
+    const_table:ConstTable,
 }
 
 impl VM{
-    pub fn new(op_codes:Vec<OpCode>)->Self{
+    pub fn new(op_codes:Vec<OpCode>,const_table:Vec<Const>)->Self{
         Self{
             stack: Default::default(),
             pc: 0,
             op_codes,
+            const_table:ConstTable::new(const_table)
         }
     }
 
@@ -31,77 +35,111 @@ impl VM{
         // }
     }
 
+    pub fn register(&self, reg:u8) -> &mut Value{
+        self.stack.register(reg)
+    }
+
     pub fn execute_code(&mut self,op:OpCode){
         match op {
-            OpCode::Or(a, b, c) => {}
-            OpCode::And(_, _, _) => {}
-            OpCode::BitOr(_, _, _) => {}
-            OpCode::BitXor(_, _, _) => {}
-            OpCode::BitAnd(_, _, _) => {}
-            OpCode::NE(_, _, _) => {}
-            OpCode::EQ(_, _, _) => {}
-            OpCode::RefEQ(_, _, _) => {}
-            OpCode::RefNE(_, _, _) => {}
-            OpCode::LT(_, _, _) => {}
-            OpCode::GT(_, _, _) => {}
-            OpCode::LE(_, _, _) => {}
-            OpCode::GE(_, _, _) => {}
-            OpCode::RefLT(_, _, _) => {}
-            OpCode::RefGT(_, _, _) => {}
-            OpCode::RefLE(_, _, _) => {}
-            OpCode::RefGE(_, _, _) => {}
-            OpCode::LMov(_, _, _) => {}
-            OpCode::RMov(_, _, _) => {}
-            OpCode::Add(_, _, _) => {}
-            OpCode::Sub(_, _, _) => {}
-            OpCode::Mul(_, _, _) => {}
-            OpCode::Div(_, _, _) => {}
-            OpCode::Mod(_, _, _) => {}
-            OpCode::Fact(_, _, _) => {}
-            OpCode::BitNot(_, _) => {}
-            OpCode::Not(_, _) => {}
-            OpCode::Neg(_, _) => {}
-            OpCode::Pos(_, _) => {}
-            OpCode::ArrayVisit(_, _, _) => {}
-            OpCode::MemberGet(_, _, _) => {}
-            OpCode::MemberSet(_, _, _) => {}
-            OpCode::RefAssign(_, _) => {}
-            OpCode::ValAssign(_, _) => {}
-            OpCode::MovConst0(_, _) => {}
-            OpCode::MovConst1(_, _) => {}
-            OpCode::MovConst2(_, _) => {}
-            OpCode::MovConst3(_, _) => {}
-            OpCode::LoadFromConst0(_, _) => {}
-            OpCode::LoadFromConst1(_, _) => {}
-            OpCode::LoadFromConst2(_, _) => {}
-            OpCode::LoadFromConst3(_, _) => {}
-            OpCode::LoadTrue(_) => {}
-            OpCode::LoadFalse(_) => {}
-            OpCode::LoadPosShort(_, _) => {}
-            OpCode::LoadNegShort(_, _) => {}
-            OpCode::LoadNil(_) => {}
-            OpCode::JmpIfPrev0(_, _) => {}
-            OpCode::JmpIfPrev1(_, _) => {}
-            OpCode::JmpIfPrev2(_, _) => {}
-            OpCode::JmpIfPrev3(_, _) => {}
-            OpCode::JmpIfPost0(_, _) => {}
-            OpCode::JmpIfPost1(_, _) => {}
-            OpCode::JmpIfPost2(_, _) => {}
-            OpCode::JmpIfPost3(_, _) => {}
-            OpCode::Call(_) => {}
-            OpCode::CallConst0(_) => {}
-            OpCode::Ret => {}
+            OpCode::Or(a, b, c) => {
+                *self.register(a) = op_or(self.register(b), self.register(c));
+                self.pc+=1;
+            }
+            OpCode::And(a, b, c) => {
+                *self.register(a) = op_and(self.register(b),self.register(c));
+                self.pc+=1;
+            }
+            OpCode::BitOr(a, b, c) => {
+                *self.register(a) = op_bit_or(self.register(b),self.register(c));
+                self.pc+=1;
+            }
+            OpCode::BitXor(a, b, c) => {
+                *self.register(a) = op_bit_xor(self.register(b),self.register(c));
+                self.pc+=1;
+            }
+            OpCode::BitAnd(a, b, c) => {
+                *self.register(a) = op_bit_and(self.register(b),self.register(c));
+                self.pc+=1;
+            }
+            OpCode::NE(a, b, c) => {
+                *self.register(a) = op_ne(self.register(b),self.register(c));
+                self.pc+=1;
+            }
+            OpCode::EQ(a, b, c) => {
+                *self.register(a) = op_eq(self.register(b),self.register(c));
+                self.pc+=1;
+            }
+            OpCode::RefEQ(a, b, c) => {
+                let mut res = false;
+                if b == c {
+                    res = true;
+                }else{
+
+                }
+                *self.register(a) = Value::InlineBool(res);
+                self.pc += 1;
+            }
+            OpCode::RefNE(_, _, _) => {unimplemented!()}
+            OpCode::LT(_, _, _) => {unimplemented!()}
+            OpCode::GT(_, _, _) => {unimplemented!()}
+            OpCode::LE(_, _, _) => {unimplemented!()}
+            OpCode::GE(_, _, _) => {unimplemented!()}
+            OpCode::LMov(_, _, _) => {unimplemented!()}
+            OpCode::RMov(_, _, _) => {unimplemented!()}
+            OpCode::Add(_, _, _) => {unimplemented!()}
+            OpCode::Sub(_, _, _) => {unimplemented!()}
+            OpCode::Mul(_, _, _) => {unimplemented!()}
+            OpCode::Div(_, _, _) => {unimplemented!()}
+            OpCode::Mod(_, _, _) => {unimplemented!()}
+            OpCode::Fact(_, _, _) => {unimplemented!()}
+            OpCode::BitNot(_, _) => {unimplemented!()}
+            OpCode::Not(_, _) => {unimplemented!()}
+            OpCode::Neg(_, _) => {unimplemented!()}
+            OpCode::Pos(_, _) => {unimplemented!()}
+            // OpCode::ArrayVisit(_, _, _) => {unimplemented!()}
+            // OpCode::MemberGet(_, _, _) => {unimplemented!()}
+            // OpCode::MemberSet(_, _, _) => {unimplemented!()}
+            OpCode::RefAssign(_, _) => {unimplemented!()}
+            OpCode::ValAssign(_, _) => {unimplemented!()}
+
+            OpCode::LoadTrue(_) => {unimplemented!()}
+            OpCode::LoadFalse(_) => {unimplemented!()}
+            OpCode::LoadPosShort(_, _) => {unimplemented!()}
+            OpCode::LoadNegShort(_, _) => {unimplemented!()}
+            OpCode::LoadNil(_) => {unimplemented!()}
+            OpCode::JmpIfPrev0(_, _) => {unimplemented!()}
+            OpCode::JmpIfPrev1(_, _) => {unimplemented!()}
+            OpCode::JmpIfPrev2(_, _) => {unimplemented!()}
+            OpCode::JmpIfPrev3(_, _) => {unimplemented!()}
+            OpCode::JmpIfPost0(_, _) => {unimplemented!()}
+            OpCode::JmpIfPost1(_, _) => {unimplemented!()}
+            OpCode::JmpIfPost2(_, _) => {unimplemented!()}
+            OpCode::JmpIfPost3(_, _) => {unimplemented!()}
+            OpCode::Call(_) => {unimplemented!()}
+            OpCode::CallConst0(_) => {unimplemented!()}
+            OpCode::Ret => {unimplemented!()}
+
+            OpCode::LoadAsConst(a, addr) => {
+                *self.register(a) = self.const_table.load_const(addr);
+                self.pc += 1;
+            }
+            OpCode::LoadAsMutRef(a, addr) => {
+                *self.register(a) = self.const_table.load_mut_ref(addr);
+                self.pc += 1;
+            }
+            OpCode::LoadAsConstRef( a, addr) => {
+                *self.register(a) = self.const_table.load_const_ref(addr);
+                self.pc += 1;
+
+            }
         }
     }
 
 
     pub fn run(&mut self){
-        let mut op = self.op_codes[0].clone();
         loop {
-            // 读取code
-
-            // 执行code
-
+            self.execute_code(self.op_codes[self.pc]);
+            println!("{:?}",self.stack)
         }
     }
 

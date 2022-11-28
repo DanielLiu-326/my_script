@@ -22,10 +22,10 @@ pub enum OpCode {
     GT(OpReg,OpReg,OpReg),
     LE(OpReg,OpReg,OpReg),
     GE(OpReg,OpReg,OpReg),
-    RefLT(OpReg,OpReg,OpReg),
-    RefGT(OpReg,OpReg,OpReg),
-    RefLE(OpReg,OpReg,OpReg),
-    RefGE(OpReg,OpReg,OpReg),
+    // RefLT(OpReg,OpReg,OpReg),
+    // RefGT(OpReg,OpReg,OpReg),
+    // RefLE(OpReg,OpReg,OpReg),
+    // RefGE(OpReg,OpReg,OpReg),
     LMov(OpReg,OpReg,OpReg),
     RMov(OpReg,OpReg,OpReg),
     Add(OpReg,OpReg,OpReg),
@@ -40,12 +40,12 @@ pub enum OpCode {
     Neg(OpReg,OpReg),
     Pos(OpReg,OpReg),
 
-    /// 数组访问操作
-    ArrayVisit(OpReg,OpReg,OpReg), //(存储结果的寄存器,数组所在的寄存器,index)
-
-    /// 结构体成员访问操作
-    MemberGet(OpReg,OpReg,OpReg), //(存储结果的寄存器，struct所在寄存器，成员ident字符串常量)
-    MemberSet(OpReg,OpReg,OpReg), //(struct所在的寄存器,成员ident字符串常量,设置的值所在的寄存器)
+    // /// 数组访问操作 postponed
+    // ArrayVisit(OpReg,OpReg,OpReg), //(存储结果的寄存器,数组所在的寄存器,index)
+    //
+    // /// 结构体成员访问操作
+    // MemberGet(OpReg,OpReg,OpReg), //(存储结果的寄存器，struct所在寄存器，成员ident字符串常量)
+    // MemberSet(OpReg,OpReg,OpReg), //(struct所在的寄存器,成员ident字符串常量,设置的值所在的寄存器)
 
     /// 赋值操作
     RefAssign(OpReg,OpReg),       //引用赋值
@@ -54,17 +54,19 @@ pub enum OpCode {
     /// 变量创建
 
 
-    //加载为常量,String,Integer,Function
-    MovConst0(OpReg,ConstAddr), //从常量区0加载数据
-    MovConst1(OpReg,ConstAddr), //从常量区1加载数据
-    MovConst2(OpReg,ConstAddr), //从常量区2加载数据
-    MovConst3(OpReg,ConstAddr), //从常量区3加载数据
+    /// Load constant from constant table
+    LoadAsConst(OpReg, ConstAddr),
+    // LoadConst1(OpReg, ConstAddr), //从常量区1加载数据
+    // LoadConst2(OpReg, ConstAddr), //从常量区2加载数据
+    // LoadConst3(OpReg, ConstAddr), //从常量区3加载数据
 
-    //加载变量，成为变量
-    LoadFromConst0(OpReg,ConstAddr),    //从常量区0加载数据
-    LoadFromConst1(OpReg,ConstAddr),    //从常量区1加载数据
-    LoadFromConst2(OpReg,ConstAddr),    //从常量区2加载数据
-    LoadFromConst3(OpReg,ConstAddr),    //从常量区3加载数据
+    /// Create variable and get it's mutable reference
+    LoadAsMutRef(OpReg,ConstAddr),
+    /// Create variable and get it's constant reference
+    LoadAsConstRef(OpReg,ConstAddr),
+    // LoadFromConst1(OpReg,ConstAddr),    //从常量区1加载数据
+    // LoadFromConst2(OpReg,ConstAddr),    //从常量区2加载数据
+    // LoadFromConst3(OpReg,ConstAddr),    //从常量区3加载数据
 
 
     //创建内嵌式Bool
@@ -75,7 +77,7 @@ pub enum OpCode {
     LoadPosShort(OpReg,u16),
     LoadNegShort(OpReg,u16),
 
-    // //创建数组 post poned
+    // //创建数组 postponed
     // LoadNewArray(OpReg,u16),	    //存储寄存器，初始大小
 
     // //创建结构体 //postponed
@@ -107,7 +109,8 @@ pub enum OpCode {
     Call(u8),
     CallConst0(ConstAddr),      //调用Const函数
 
-    Ret,                        //弹出到基地址寄存器，弹出到程序计数器
+    Ret,                        //弹出到基地址寄存器，弹出到程序计数
+
 }
 
 impl Clone for OpCode {

@@ -9,3 +9,4 @@ proc-macro = true
 [dependencies]
 syn ={version = "*",features=["full"]}
 proc-macro2 = "1.0"
+convert_case = "*"

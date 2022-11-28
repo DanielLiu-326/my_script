@@ -1,48 +1,40 @@
 use std::alloc;
 use std::alloc::Layout;
 use std::ffi::c_void;
-use std::fmt::{Debug, Formatter};
 use std::mem::size_of;
+use std::ptr::NonNull;
 
 #[inline(always)]
-pub fn allocate_value<T>(val:T) -> *mut T {
+pub fn allocate_value<T>(val:T) -> NonNull<T>  {
     unsafe {
-        let p_val = allocate::<T>();
-        *p_val = val;
+        let mut p_val = allocate::<T>();
+        *p_val.as_mut() = val;
         return p_val;
     }
 }
 
 #[inline(always)]
-pub fn allocate<T>() -> *mut T {
-    unsafe {
-        allocate_raw(size_of::<T>()).cast()
-    }
+pub fn allocate<T>() -> NonNull<T> {
+    allocate_raw(size_of::<T>()).cast()
 }
 
 #[inline(always)]
-pub fn allocate_raw(size: usize) -> *mut c_void {
-    unsafe {
-        let allocated = alloc::alloc(
-            Layout::from_size_align(size + size_of::<usize>(),
-                                    size_of::<usize>()
-            ).unwrap(),
-        ).cast::<usize>();
-
-        *(allocated as *mut usize) = size + size_of::<usize>();
-
-        allocated.add(1).cast()
-    }
-}
+pub fn allocate_raw(size: usize) -> NonNull<c_void> {unsafe{
+    NonNull::new_unchecked(
+        alloc::alloc(
+            Layout::from_size_align_unchecked(size, size_of::<usize>())
+        ).add(size_of::<usize>()).cast()
+    )
+}}
 
 
 #[inline]
-pub fn deallocate(ptr: *mut c_void) {
+pub fn deallocate(ptr: NonNull<c_void>) {
     unsafe {
-        let allocated = ptr.cast::<usize>().sub(1);
+        let allocated = ptr.cast::<usize>().as_ptr().sub(1);
         alloc::dealloc(
             allocated.cast(),
-            Layout::from_size_align(*allocated, size_of::<usize>()).unwrap(),
+            Layout::from_size_align_unchecked(*allocated, size_of::<usize>()),
         );
     }
 }
