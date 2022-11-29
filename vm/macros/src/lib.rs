@@ -3,247 +3,130 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::ops::{Deref, DerefMut};
 use syn::parse::{Parse};
 use syn::parse::ParseStream;
-use syn::{Expr, PathArguments};
+use syn::{Expr, ItemEnum, PathArguments};
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use syn::__private::ToTokens;
 use convert_case::{Case, Casing};
+use syn::spanned::Spanned;
 
-static mut VAL_TAGS     : Option<Vec<String>> = None;
+//Option<Vec<(ValueTag,ValueType)>>
+static mut VALUE_TAGS   :Option<Vec<(String,String)>>= None;
 
-static mut REF_TAGS     : Option<Vec<String>> = None;
+//BTreeMap<OpName,Vec<ValueTypes>>
+static mut BINARY_OPS   :Option<BTreeMap<String,BTreeSet<String>>> = None;
 
-static mut REF_TYPES    : Option<Vec<String>> = None;
-
-static mut BINARY_OPS   : Option<Vec<String>> = None;
-
-static mut UNARY_OPS    : Option<Vec<String>> = None;
-
-
-
-
-// the value name
-static mut VALUE_NAME   :Option<String> = None;
-// all tokens in enum value;
-static mut VALUE_TOKENS :Option<Vec<String>> = None;
-//(type,implemented op traits)
-static mut VALUE_TYPES  :Option<BTreeSet<String>> = None;
-//<op,(left,right)>
-static mut BINARY_OPS   :Option<BTreeMap<String,BTreeSet<(String, String)>>> = None;
-//<op,left>
+//BTreeMap<OpName,Vec<ValueTypes>>
 static mut UNARY_OPS    :Option<BTreeMap<String,BTreeSet<String>>> = None;
 
+/// ```rust
+/// #[define_val]
+/// pub enum Value{
+///     Integer(Integer),
+///     Float(Float),
+///     Bool(Bool),
+/// }
+/// ```
+
 #[proc_macro_attribute]
-pub fn define_val(_attr: TokenStream, item: TokenStream) -> TokenStream{unsafe{
-
-    let item_enum = syn::parse::<syn::ItemEnum>(item.clone()).unwrap();
-
-    VALUE_NAME = Some(item_enum.ident.to_string());
-
-    VALUE_TOKENS = Some(
-        item_enum.variants.iter().map(|a| {
-            a.ident.to_string()
-        }).collect()
-    );
-
-    VALUE_TYPES = Some(item_enum.variants.iter().map(|a|{
-        a.fields.iter().next().unwrap().ty.to_token_stream().to_string()
-    }).collect());
-
-    item
-}}
-#[proc_macro_attribute]
-pub fn op_define(_attr: TokenStream, item: TokenStream) -> TokenStream {unsafe {
-
-    let trait_define = syn::parse::<syn::ItemTrait>(item.clone()).unwrap();
-
-    let op_name = trait_define.ident.to_string();
-
-    if trait_define.generics.params.is_empty(){
-        //unary op
-        UNARY_OPS = UNARY_OPS.take().map_or(Some({
-            let mut ret:BTreeMap<String,BTreeSet<String>> = Default::default();
-            ret.insert(op_name.clone(),Default::default());
-            ret
-        }), |mut ops|{
-            ops.insert(op_name,BTreeSet::default());
-            Some(ops)
-        });
-    }else{
-        //binary op
-        BINARY_OPS = BINARY_OPS.take().map_or(Some({
-            let mut ret:BTreeMap<String,BTreeSet<(String,String)>> = Default::default();
-            ret.insert(op_name.clone(),Default::default());
-            ret
-        }), |mut ops|{
-            ops.insert(op_name,BTreeSet::default());
-            Some(ops)
-        });
+pub fn def_val(attr:TokenStream,item:TokenStream) -> TokenStream{
+    struct ValueDefine{
+        enums:Vec<(String,String)>,
     }
-
-    item
-}}
-
-///#[impl_op(binary)] or #[impl_op(unary)]
-#[proc_macro_attribute]
-pub fn impl_op(_attr: TokenStream, item: TokenStream) -> TokenStream {unsafe{
-
-    //impl OpAdd for Integer
-    let impl_block = syn::parse::<syn::ItemImpl>(item.clone()).unwrap();
-
-    let left = (*impl_block.self_ty).clone().to_token_stream().to_string();
-
-    let trait_name = impl_block.trait_.as_ref().unwrap().1.segments
-        .last().unwrap().ident
-        .to_token_stream().to_string();
-
-    let right = &impl_block.trait_.as_ref().unwrap().1.segments.last().unwrap().arguments;
-
-    if right.is_empty(){
-
-        //left operator
-        UNARY_OPS.as_mut().unwrap()
-            .get_mut(&trait_name).unwrap()
-            .insert(left);
-    }else{
-        //unary operator
-        let right = match right{
-            PathArguments::AngleBracketed(ref a) =>{Some(a)},
-            _ =>{None},
-        }.unwrap().args.last().unwrap().to_token_stream().to_string();
-
-        BINARY_OPS.as_mut().unwrap()
-            .get_mut(&trait_name).unwrap()
-            .insert((left, right));
-    }
-
-    item
-}}
-
-
-#[proc_macro]
-pub fn impl_default(items: TokenStream) -> TokenStream {unsafe{
-    // impl_default!{
-    //      Add => {
-    //          ...
-    //     }
-    // }
-    println!("impl_default");
-    #[derive(Clone)]
-    pub struct ImplDefault{
-        trait_name:String,
-        block:syn::Block,
-    }
-    impl syn::parse::Parse for ImplDefault{
+    impl Parse for ValueDefine{
         fn parse(input: ParseStream) -> syn::Result<Self> {
-            let trait_name = input.parse::<syn::Ident>()?.to_string();
-            input.parse::<syn::token::FatArrow>()?;
-            let block = input.parse()?;
-            Ok(Self{
-                trait_name,
-                block,
-            })
-        }
-    }
-
-    pub struct ImplDefaults(Vec<ImplDefault>);
-    impl syn::parse::Parse for ImplDefaults{
-        fn parse(input: ParseStream) -> syn::Result<Self> {
-            let impl_defaults = Punctuated::<ImplDefault,Comma>::parse_separated_nonempty(input)?;
-            Ok(Self(
-                impl_defaults.iter().map(|x|{x.clone()}).collect()
-            ))
-        }
-    }
-
-    let mut ret = String::new();
-    let impl_defaults = syn::parse::<ImplDefaults>(items).unwrap();
-
-    for impl_default in impl_defaults.0.iter() {
-        for left in VALUE_TYPES.as_ref().unwrap().iter() {
-            if UNARY_OPS.as_ref().unwrap().contains_key(&impl_default.trait_name){
-                //iterate right operatee value
-                if UNARY_OPS.as_ref().unwrap().get(&impl_default.trait_name).unwrap()
-                    .get(&left.clone()).is_none() {
-                    ret += format!("impl {} for {}{{", impl_default.trait_name, left).as_str();
-                    ret += format!("fn {}(&self) -> Value{}",
-                                   impl_default.trait_name.to_case(Case::Snake),
-                                   impl_default.block.to_token_stream().to_string(),
-                    ).as_str();
-                    ret += "}";
-                }
-            }else if BINARY_OPS.as_ref().unwrap().contains_key(&impl_default.trait_name) {
-                //iterate left operatee value tag
-                for right in VALUE_TYPES.as_ref().unwrap().iter() {
-                    //iterate right operatee value tag
-                    if BINARY_OPS.as_ref().unwrap().get(&impl_default.trait_name).unwrap()
-                        .get(&(left.clone(), right.clone())).is_none() {
-                        ret += format!("impl {}<{}> for {}{{", impl_default.trait_name, right, left).as_str();
-                        ret += format!("fn {}(&self,other:&{}) -> Value{}",
-                                       impl_default.trait_name.to_case(Case::Snake),
-                                       right,
-                                       impl_default.block.to_token_stream().to_string(),
-                        ).as_str();
-                        ret += "}";
-                    }
-                }
+            let enums = Vec::new();
+            let parse:ItemEnum = input.parse()?;
+            // check defines
+            for x in parse.variants{
+                //check if the Enum value just has one field
+                if x.fields.iter().count()!=1
+                enums.push((
+                    x.ident.to_string(),
+                    x.fields.iter().last().unwrap_or_else(||{syn::Error::new(x.fields.span(),"f")})
+                    ));
             }
         }
-
-    }
-    return ret.parse().unwrap();
-}}
-
-struct MatchArgument {
-    expr:String,
-    block:String,
-}
-impl Parse for MatchArgument {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let expr = input.parse::<Expr>()?;
-        input.parse::<Comma>()?;
-        let block = input.parse::<syn::Block>()?;
-        Ok(Self{
-            expr: expr.to_token_stream().to_string(),
-            block: block.to_token_stream().to_string(),
-        })
     }
 }
+/// ```rust
+/// #[define_binary_op(OpAdd,op_add)]
+/// pub trait OpAdd<T>{
+///     fn op_add(&self)
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn def_binary_op(attr:TokenStream,item:TokenStream) -> TokenStream{
 
-/// match_1_value!(a,{
-///     ...
-/// })
-#[proc_macro]
-pub fn match_1_value(item:TokenStream)->TokenStream{unsafe{
+}
 
-    let arguments = syn::parse::<MatchArgument>(item).unwrap();
+#[proc_macro_attribute]
+pub fn def_unary_op(attr:TokenStream,item:TokenStream) -> TokenStream{
 
-    let mut ret = String::new();
-    ret += format!("match {} {{",arguments.expr).as_str();
-    for x in VALUE_TOKENS.as_ref().unwrap(){
-        ret += format!("Value::{}(a) => {},",x,arguments.block).as_str()
-    }
-    ret+="}";
+}
 
-    return ret.parse().unwrap();
-}}
+#[proc_macro_attribute]
+pub fn impl_op(attr:TokenStream,item:TokenStream) -> TokenStream{
 
-/// match_2_value!((a,b),{
-///     ...
-/// })
-#[proc_macro]
-pub fn match_2_values(item:TokenStream) ->TokenStream{unsafe{
+}
 
-    let arguments = syn::parse::<MatchArgument>(item).unwrap();
 
-    let mut ret = String::new();
-    ret += format!("match {} {{",arguments.expr).as_str();
-    for x in VALUE_TOKENS.as_ref().unwrap(){
-        for y in VALUE_TOKENS.as_ref().unwrap(){
-            ret += format!("(Value::{}(a),Value::{}(b)) => {},",x,y,arguments.block).as_str()
+macro_rules! def_binary_op_trait {
+    ($trait_name:ident,$fn_name:ident->$ret_type:ident) => {paste!{
+        #[def_binary_op($trait_name,$fn_name)]
+        pub trait $trait_name<T> {
+            fn $fn_name(&self,_other:&T) -> $ret_type;
         }
-    }
-    ret+="}";
+        #[inline(always)]
+        pub fn $fn_name(a:&Value,b:&Value) -> Value {
+            return match_2_values!((a,b),{a.unbox_const().$fn_name(b.unbox_const())});
+        }
+    }};
+}
 
-    return ret.parse().unwrap();
-}}
+macro_rules! def_unary_op_trait {
+    ($trait_name:ident,$fn_name:ident,ReturnType) => {paste!{
+        #[op_define]
+        pub trait $trait_name {
+            #[inline(always)]
+            fn $fn_name(&self)->Value{
+                unimplemented!()
+            }
+        }
+        #[inline(always)]
+        pub fn $fn_name<T:$trait_name>(a:&Value) -> Value{
+            return match_1_value!(a,{a.unbox_const().$fn_name()});
+        }
+    }}
+}
+
+/// ```rust
+/// #[impl_op_default]
+/// impl OpAdd<Integer> for Bool{
+///     fn op_add(&self,other:Integer) -> Value{
+///
+///     }
+/// }
+/// ```
+#[proc_macro]
+pub fn impl_default(attr:TokenStream,item:TokenStream) -> TokenStream{
+
+}
+
+/// ```rust
+/// match_2_values!(ValueType,(left,right),{
+///     a.unbox().op_add(right)
+/// })
+/// ```
+
+#[proc_macro]
+fn match_2_values(input:TokenStream)->TokenStream{
+
+}
+
+
+#[proc_macro]
+fn match_1_value(input:TokenStream) -> TokenStream{
+
+}
+

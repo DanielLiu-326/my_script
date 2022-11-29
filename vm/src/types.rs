@@ -51,11 +51,15 @@ impl<T> UncheckMut<T> {
 ///
 /// Register Types
 ///
-
-
 pub trait RegTy{
     type Output;
-    fn unbox(&self) -> Self::Output;    //unbox the reference into the type that can be operatee.
+    //unbox the reference into the type that can be operatee.
+    fn unbox_const(&self) -> Option<&Self::Output>{
+        None
+    }
+    fn unbox_mut(&self) -> Option<&mut Self::Output>{
+        None
+    }
 }
 
 
@@ -107,170 +111,194 @@ pub enum RegType {
 pub struct InlineInteger(UncheckMut<Integer>);
 
 impl RegTy for InlineInteger{
-    type Output = Mutable<'_,Integer>;
+    type Output = Integer;
 
-    fn unbox(&self) -> Self::Output {
-        self.0.ref_mut()
+    fn unbox_const(&self) -> Option<&Self::Output> {
+        Some(&*self.0.ref_mut())
+    }
+
+    fn unbox_mut(&self) -> Option<&mut Self::Output> {
+        Some(self.0.ref_mut())
     }
 }
 
 pub struct InlineFloat(UncheckMut<Float>);
 
-impl RegTy for InlineFloat{
-    type Output = Mutable<'_,Float>;
-
-    fn unbox(&self) -> Self::Output {
-        self.0.ref_mut()
+impl RegTy for InlineFloat {
+    type Output = Float;
+    fn unbox_const(&self) -> Option<&Self::Output> {
+        Some(&*self.0.ref_mut())
+    }
+    fn unbox_mut(&self) -> Option<&mut Self::Output> {
+        Some(self.0.ref_mut())
     }
 }
 
 pub struct InlineBool(UncheckMut<Bool>);
 
 impl RegTy for InlineBool{
-    type Output = Mutable<'_,Bool>;
+    type Output = Bool;
 
-    fn unbox(&self) -> Self::Output {
-        self.0.ref_mut()
+    fn unbox_const(&self) -> Option<&Self::Output> {
+        Some(&*self.0.ref_mut())
+    }
+
+    fn unbox_mut(&self) -> Option<&mut Self::Output> {
+        Some(self.0.ref_mut())
     }
 }
 
 pub struct ConstInlineInteger(Integer);
 
 impl RegTy for ConstInlineInteger{
-    type Output = Immutable<'_,Integer>;
+    type Output = Integer;
 
-    fn unbox(&self) -> Self::Output {
-        (&self.0).into()
+    fn unbox_const(&self) -> Option<&Self::Output> {
+        Some(&self.0)
     }
 }
 
 pub struct ConstInlineFloat(Float);
 
 impl RegTy for ConstInlineFloat{
-    type Output = Immutable<'_,Float>;
-
-    fn unbox(&self) -> Self::Output {
-        (&self.0).into()
+    type Output = Float;
+    fn unbox_const(&self) -> Option<&Self::Output> {
+        Some(&self.0)
     }
 }
 
 pub struct ConstInlineBool(Bool);
 
 impl RegTy for ConstInlineBool{
-    type Output = Immutable<'_,Bool>;
-
-    fn unbox(&self) -> Self::Output {
-        (&self.0).into()
+    type Output = Bool;
+    fn unbox_const(&self) -> Option<&Self::Output> {
+        Some(&self.0)
     }
 }
 
 pub struct RefInteger(UncheckMut<RefCount<Integer>>);
 
 impl RegTy for RefInteger{
-    type Output = Mutable<'_,Integer>;
+    type Output = Integer;
 
-    fn unbox(&self) -> Self::Output {
-        &mut **self.0.ref_mut()
+    fn unbox_const(&self) -> Option<&Self::Output> {
+        Some(&*self.0.ref_mut())
+    }
+
+    fn unbox_mut(&self) -> Option<&mut Self::Output> {
+        Some(self.0.ref_mut())
     }
 }
 
 pub struct RefFloat(UncheckMut<RefCount<Float>>);
 
 impl RegTy for RefFloat{
-    type Output = Mutable<'_,Float>;
+    type Output = Float;
 
-    fn unbox(&self) -> Self::Output {
-        &mut **self.0.ref_mut()
+    fn unbox_const(&self) -> Option<&Self::Output> {
+        Some(&*self.0.ref_mut())
+    }
+
+    fn unbox_mut(&self) -> Option<&mut Self::Output> {
+        Some(self.0.ref_mut())
     }
 }
 
 pub struct RefBool(UncheckMut<RefCount<Bool>>);
 
-impl RegTy for RefBool{
-    type Output = Mutable<'_,Bool>;
+impl RegTy for RefFloat{
+    type Output = Bool;
 
-    fn unbox(&self) -> Self::Output {
-        &mut **self.0.ref_mut()
+    fn unbox_const(&self) -> Option<&Self::Output> {
+        Some(&*self.0.ref_mut())
+    }
+
+    fn unbox_mut(&self) -> Option<&mut Self::Output> {
+        Some(self.0.ref_mut())
     }
 }
+
 
 pub struct ConstRefInteger(RefCount<Integer>);
 
 impl RegTy for ConstRefInteger{
-    type Output = Immutable<'_,Integer>;
+    type Output = Integer;
 
-    fn unbox(&self) -> Self::Output {
-        (&*self.0).into()
+    fn unbox_const(&self) -> Option<&Self::Output> {
+        Some(self.0.deref())
     }
 }
 
 pub struct ConstRefFloat(RefCount<Float>);
 
 impl RegTy for ConstRefFloat{
-    type Output = Immutable<'_,Float>;
+    type Output = Float;
 
-    fn unbox(&self) -> Self::Output {
-        (&*self.0).into()
+    fn unbox_const(&self) -> Option<&Self::Output> {
+        Some(self.0.deref())
     }
 }
 
 pub struct ConstRefBool(RefCount<Bool>);
 
 impl RegTy for ConstRefBool{
-    type Output = Immutable<'_,Bool>;
+    type Output = Bool;
 
-    fn unbox(&self) -> Self::Output {
-        (&*self.0).into()
+    fn unbox_const(&self) -> Option<&Self::Output> {
+        Some(self.0.deref())
     }
 }
 
 pub struct ConstInteger(RefCount<Integer>);
 
 impl RegTy for ConstInteger{
-    type Output = Immutable<'_,Integer>;
+    type Output = Integer;
 
-    fn unbox(&self) -> Self::Output {
-        (&*self.0).into()
+    fn unbox_const(&self) -> Option<&Self::Output> {
+        Some(self.0.deref())
     }
 }
 
 pub struct ConstFloat(RefCount<Float>);
 
 impl RegTy for ConstFloat{
-    type Output = Immutable<'_,Float>;
+    type Output = Float;
 
-    fn unbox(&self) -> Self::Output {
-        (& *self.0).into()
+    fn unbox_const(&self) -> Option<&Self::Output> {
+        Some(self.0.deref())
     }
+
 }
 
 pub struct ConstBool(RefCount<Bool>);
 
 impl RegTy for ConstBool{
-    type Output = Immutable<'_,Bool>;
+    type Output = Bool;
 
-    fn unbox(&self) -> Self::Output {
-        (& *self.0).into()
+    fn unbox_const(&self) -> Option<&Self::Output> {
+        Some(self.0.deref())
     }
 }
 
 pub struct RefNil(UncheckMut<Nil>);
 
 impl RegTy for RefNil{
-    type Output = Mutable<'_,Nil>;
-
-    fn unbox(&self) -> Self::Output {
-        self.0.ref_mut()
+    type Output = Nil;
+    fn unbox_const(&self) -> Option<&Self::Output> {
+        Some(&*self.0.ref_mut())
+    }
+    fn unbox_mut(&self) -> Option<&mut Self::Output> {
+        Some(self.0.ref_mut())
     }
 }
 
 pub struct ConstRefNil(Nil);
 
 impl RegTy for ConstRefNil{
-    type Output = Immutable<'_,Nil>;
+    type Output = Nil;
 
-    fn unbox(&self) -> Self::Output {
-        (&self.0).into()
+    fn unbox_const(&self) -> Option<&Self::Output> {
+        Some(&self.0)
     }
 }
 
@@ -281,14 +309,14 @@ impl RegTy for ConstRefNil{
 ///
 
 macro_rules! def_binary_op_trait {
-    ($trait_name:ident,) => {paste!{
+    ($trait_name:ident,$fn_name:ident) => {paste!{
         #[op_define]
         pub trait $trait_name<T> {
             fn $fn_name(&self,_other:&T) -> Value;
         }
         #[inline(always)]
         pub fn $fn_name(a:&Value,b:&Value) -> Value {
-            return match_2_values!((a,b),{a.unbox().$fn_name(b.unbox())});
+            return match_2_values!((a,b),{a.unbox_const().$fn_name(b.unbox_const())});
         }
     }};
 }
@@ -304,7 +332,7 @@ macro_rules! def_unary_op_trait {
         }
         #[inline(always)]
         pub fn $fn_name<T:$trait_name>(a:&Value) -> Value{
-            return match_1_value!(a,{a.unbox().$fn_name()});
+            return match_1_value!(a,{a.unbox_const().$fn_name()});
         }
     }}
 }
@@ -332,16 +360,6 @@ def_binary_op_trait!(OpMul,      op_mul);
 def_binary_op_trait!(OpDiv,      op_div);
 def_binary_op_trait!(OpMod,      op_mod);
 def_binary_op_trait!(OpFact,     op_fact);
-
-pub trait OpValAssign{
-    fn op_val_assign(&mut self) {
-
-    }
-}
-
-pub fn op_val_assign(a:&Value,b:&Value){
-    match_2_same_value!();
-}
 
 //
 // Unary Ops
