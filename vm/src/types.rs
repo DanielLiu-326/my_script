@@ -1,5 +1,6 @@
 use std::arch::x86_64::_xabort;
 use std::cell::{RefMut, UnsafeCell};
+use std::error::Error;
 use std::fmt::{Debug, Formatter};
 use std::mem::Discriminant;
 use std::net::IpAddr;
@@ -37,43 +38,20 @@ pub enum Value{
 pub struct UncheckMut<T>(UnsafeCell<T>);
 
 impl<T> UncheckMut<T> {
+    fn new(val:T)->Self{
+        Self(UnsafeCell::new(val))
+    }
     #[inline(always)]
-    fn ref_mut(&self)->Mutable<'_,T>{unsafe{
-        (&mut *self.0.get()).into()
+    fn ref_mut(&self)-> &mut T{unsafe{
+        (&mut *self.0.get())
     }}
 }
 
-pub struct Immutable<'a,T>(&'a T);
-
-impl<'a,T> Into<Immutable<'a,T>> for &'a T{
-    fn into(self) -> Immutable<'a, T> {
-        Immutable::from(self)
-    }
-}
-
-impl<'a,T> From<&'a T> for Immutable<'a,T>{
-    fn from(val: &'a T) -> Self {
-        Self(val)
-    }
-}
-
-pub struct Mutable<'a,T>(&'a mut T);
-
-impl<'a,T> Into<Mutable<'a,T>> for &'a mut T{
-    fn into(self) -> Mutable<'a, T> {
-        Mutable::from(self)
-    }
-}
-
-impl<'a,T> From<&'a mut T> for Mutable<'a,T>{
-    fn from(val: &'a mut T) -> Self {
-        Self(val)
-    }
-}
 
 ///
 /// Register Types
 ///
+
 
 pub trait RegTy{
     type Output;
