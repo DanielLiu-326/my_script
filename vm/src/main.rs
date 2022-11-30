@@ -6,6 +6,8 @@
 #![feature(concat_idents)]
 #![feature(portable_simd)]
 
+use crate::stack::VmStack;
+
 ///
 /// 虚拟机结构：
 /// - 栈
@@ -63,12 +65,12 @@
 
 
 
-extern crate core;
-
-use crate::opcode::OpCode;
-use crate::types::Const;
-use crate::util::{allocate_value};
-use crate::vm::VM;
+// extern crate core;
+//
+// use crate::opcode::OpCode;
+// use crate::types::Const;
+// use crate::util::{allocate_value};
+// use crate::vm::VM;
 
 mod opcode;
 
@@ -80,24 +82,25 @@ mod stack;
 mod const_table;
 
 fn main() {
-    let mut const_table = Vec::new();
-    let mut op_codes = Vec::new();
-
-    //opcodes
-    op_codes.push(OpCode::LoadAsConst(0,0));
-    op_codes.push(OpCode::LoadAsConst(1,1));
-
-    op_codes.push(OpCode::And(2,0,1));
-    op_codes.push(OpCode::Or(3,0,1));
-    op_codes.push(OpCode::BitAnd(4,0,0));
-
-
-    //consts
-    const_table.push(Const::Bool(allocate_value(false).into()));
-    const_table.push(Const::Bool(allocate_value(true).into()));
-
-    let mut vm = VM::new(op_codes,const_table);
-
-    vm.run();
+    let stack = VmStack::default();
+    println!("{:?}",stack);
+    // let mut const_table = Vec::new();
+    // let mut op_codes = Vec::new();
+    //
+    // //opcodes
+    // op_codes.push(OpCode::LoadAsConst(0,0));
+    // op_codes.push(OpCode::LoadAsConst(1,1));
+    //
+    // op_codes.push(OpCode::And(2,0,1));
+    // op_codes.push(OpCode::Or(3,0,1));
+    // op_codes.push(OpCode::BitAnd(4,0,0));
+    //
+    //
+    // //consts
+    // const_table.push(Const::Bool(allocate_value(false).into()));
+    // const_table.push(Const::Bool(allocate_value(true).into()));
+    //
+    // let mut vm = VM::new(op_codes,const_table);
+    // vm.run();
 
 }

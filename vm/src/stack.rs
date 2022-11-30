@@ -1,9 +1,9 @@
-use std::cell::UnsafeCell;
 use std::fmt::{Debug, format, Formatter};
-use crate::types::Value;
+use crate::types::{RegType, Value};
+use crate::util::UncheckMut;
 
 pub struct VmStack{
-    stack:UnsafeCell<[Value;65535]>,
+    stack:UncheckMut<[RegType;65535]>,
     bs:usize,
 }
 
@@ -20,9 +20,9 @@ impl Default for VmStack{
 
 impl VmStack{
     #[inline(always)]
-    pub fn register(&self, reg:u8) -> &mut Value{
+    pub fn register(&self, reg:u8) -> &mut RegType{
         unsafe {
-            &mut (*self.stack.get())[self.bs+reg as usize]
+            &mut self.stack.get_mut()[self.bs+reg as usize]
         }
     }
 
@@ -42,7 +42,7 @@ impl Debug for VmStack{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {unsafe{
         writeln!(f,"Stack Dbg:")?;
         for x in 0..(self.bs + 256){
-            writeln!(f,"{:?}",(*self.stack.get())[x])?
+            writeln!(f,"{:?}",self.stack.get()[x])?
         }
         writeln!(f,"--------------")
     }}

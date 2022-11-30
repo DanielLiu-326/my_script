@@ -1,6 +1,3 @@
-
-
-
 type OpReg             = u8;    //寄存器编号类型
 type ConstAddr         = u16;   //常量指针类型
 type RelativeAddr      = u16;   //相对地址类型

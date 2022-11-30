@@ -1,8 +1,10 @@
 use std::alloc;
 use std::alloc::Layout;
+use std::cell::UnsafeCell;
 use std::ffi::c_void;
 use std::mem::size_of;
 use std::ptr::NonNull;
+
 
 #[inline(always)]
 pub fn allocate_value<T>(val:T) -> NonNull<T>  {
@@ -38,6 +40,26 @@ pub fn deallocate(ptr: NonNull<c_void>) {
         );
     }
 }
+
+pub struct UncheckMut<T>(UnsafeCell<T>);
+
+impl<T> UncheckMut<T>{
+    #[inline(always)]
+    pub fn new(val:T)->Self{
+        Self(UnsafeCell::new(val))
+    }
+
+    #[inline(always)]
+    pub fn get_mut(& self) -> & mut T{unsafe{
+        &mut *self.0.get()
+    }}
+
+    #[inline(always)]
+    pub fn get(& self) -> & T{unsafe{
+        &*self.get_mut()
+    }}
+}
+
 pub mod ptr{
 
     pub mod thin_dyn {
