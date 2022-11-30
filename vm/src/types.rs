@@ -23,7 +23,7 @@ pub type Bool       = bool;
 
 pub struct Nil();
 
-#[val_define]
+#[val_def]
 pub enum Value{
     Integer(Integer),
     Float(Float),
@@ -61,6 +61,7 @@ pub trait RegTy{
         None
     }
 }
+
 
 
 #[ref_define]
