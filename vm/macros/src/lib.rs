@@ -3,7 +3,7 @@ extern crate core;
 use proc_macro::{ TokenStream};
 use convert_case::{Case, Casing};
 use syn::token::{Comma, FatArrow};
-use syn::{Block, braced, Token, TypeTuple, ItemEnum, Expr,Ident};
+use syn::{Block, braced, Token, ItemEnum, Expr, Ident, PatTuple, Pat};
 use syn::__private::ToTokens;
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
@@ -37,7 +37,6 @@ pub fn val_enum_def(_attr:TokenStream,input:TokenStream) -> TokenStream{unsafe{
         }
     }
 
-
     REF_VAL_TYPE = "Ref".to_string() + VAL_ENUM_TYPE.as_str();
     REF_MUT_VAL_TYPE = "RefMut".to_string() + VAL_ENUM_TYPE.as_str();
 
@@ -59,7 +58,6 @@ pub fn val_enum_def(_attr:TokenStream,input:TokenStream) -> TokenStream{unsafe{
             }}
         }}"#,REF_VAL_TYPE,type_name,REF_VAL_TYPE,REF_VAL_TYPE,enum_variant).as_str()
     }
-
 
     ret_code+=format!("pub enum {}<'a>{{ {} }}",
                       REF_MUT_VAL_TYPE,
@@ -177,8 +175,14 @@ pub fn match_1_reg(input:TokenStream)->TokenStream{unsafe{
         {}
     }}"#,input.expr.to_token_stream().to_string(),
         REG_ENUMS.iter().map(|(enum_variant,_)|{
-            format!("{}::{}({}) => {{ let __variant__ = \"{}\";{} }},", REG_ENUM_TYPE, enum_variant,input.var_name.to_string(),enum_variant,input.block.to_token_stream().to_string())}
-        ).reduce(|res,now|{res + &now}).unwrap().as_str()
+            format!("{}::{}({}) => {{ let __variant__ = \"{}\";{} }},",
+                    REG_ENUM_TYPE,
+                    enum_variant,
+                    input.var_name.to_string(),
+                    enum_variant,
+                    input.block.to_token_stream().to_string()
+            )
+        }).reduce(|res,now|{res + &now}).unwrap().as_str()
     );
 
 
@@ -186,24 +190,37 @@ pub fn match_1_reg(input:TokenStream)->TokenStream{unsafe{
 
 }}
 
-
-
-
 struct BinaryOpBody{
-    tuple:TypeTuple,
+    pat:PatTuple,
     fat_arrow:FatArrow,
     block:Block,
 }
 impl Parse for BinaryOpBody{
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let tuple:TypeTuple = input.parse()?;
+
+        let pat = if let Pat::Tuple(tuple) = input.parse()?{
+            if tuple.elems.iter().count()!=2{
+                Err(syn::Error::new(
+                    tuple.span(),
+                    "Must be a two-element tuple pattern such as (LeftType,RightType)!"
+                ))
+            }else{
+                Ok(tuple)
+            }
+        }else{
+            Err(syn::Error::new(
+                input.span(),
+                "Must be a two-element tuple pattern such as (LeftType,RightType)!"
+            ))
+        }?;
+
         let fat_arrow = input.parse()?;
         let block = input.parse()?;
-        if tuple.elems.iter().count()!=2{
-            Err(syn::Error::new(tuple.span(),"Two value types expected"))?;
+        if pat.elems.iter().count()!=2{
+            Err(syn::Error::new(pat.span(),"Two Value types expected"))?;
         }
         Ok(Self{
-            tuple,
+            pat,
             fat_arrow,
             block
         })
@@ -211,6 +228,7 @@ impl Parse for BinaryOpBody{
 }
 
 struct ImplBinaryOp{
+    mutbility:Option<syn::token::Mut>,
     ident:syn::Ident,
     fat_arrow:FatArrow,
     brace: syn::token::Brace,
@@ -219,12 +237,14 @@ struct ImplBinaryOp{
 impl Parse for ImplBinaryOp{
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let content;
+        let mutbility = input.parse()?;
         let ident = input.parse()?;
         let fat_arrow = input.parse()?;
         let brace = braced!(content in input);
         let bodies = Punctuated::parse_terminated(&content)?;
 
         Ok(Self{
+            mutbility,
             ident,
             fat_arrow,
             brace,
@@ -252,54 +272,110 @@ impl Parse for ImplBinaryOps{
 ///         (Integer,Integer) => {
 ///             Value::Integer(left+right)
 ///         },
-///     }
+///         (_,_) => {
+///             Value::Nil(Nil())
+///         }
+///     },
 /// }
 /// ```
 #[proc_macro]
 pub fn impl_binary_ops(input:TokenStream) -> TokenStream{unsafe{
     let input:ImplBinaryOps = syn::parse(input).unwrap();
     let mut code = String::new();
+    let mut mutibility = false;
     for y in input.ops {
+        mutibility = y.mutbility.is_some();
+        let (ref_val_type,unbox_fn_name) = if mutibility {
+            (REF_MUT_VAL_TYPE.as_str(),"unbox_mut")
+        }else{
+            (REF_VAL_TYPE.as_str(),"unbox_const")
+        };
+
         code += "#[inline(always)]";
-        code += format!("pub fn {}(left:&{},right:&{}) -> {} {{",y.ident.to_string().to_case(Case::Snake),VAL_ENUM_TYPE,VAL_ENUM_TYPE,REG_ENUM_TYPE).as_str();
-        code += format!("match (left , right){{").as_str();
+        code += format!("pub fn {}_impl(left:&{},right:&{}) -> Option<{}> {{",
+                        y.ident.to_string().to_case(Case::Snake),
+                        REG_ENUM_TYPE,
+                        REG_ENUM_TYPE,
+                        VAL_ENUM_TYPE
+        ).as_str();
+
+        code += format!("match (left.{}().unwrap() , right.unbox_const().unwrap()){{",
+                        unbox_fn_name
+        ).as_str();
+
         for x in y.bodies{
-            let elems = &x.tuple.elems;
+            let elems = &x.pat.elems;
             let first = elems.first().unwrap().to_token_stream().to_string();
             let second = elems.last().unwrap().to_token_stream().to_string();
 
             // find enum variant by variable first
-            let left_enum_variant = if first!= "_" {
-                (
-                    *VAL_ENUMS.iter().find(|(_,type_name)|{
-                        type_name == &first
-                    }).expect(format!("Type {} is not a Value",first).as_str())
-                ).0.clone()
+            let left_pat = if first!= "_" {
+                format!("{}::{}(left)",ref_val_type, (
+                        *VAL_ENUMS.iter().find(|(_,type_name)|{
+                            type_name == &first
+                        }).expect(format!("Type {} is not a Value",first).as_str())
+                ).0)
             }else{
-                "_".to_string()
+                "left".to_string()
             };
 
             // find enum variant by variable second
-            let right_enum_variant = if first!= "_" {
-                (
+            let right_pat = if first!= "_" {
+                format!("{}::{}(right)",REF_VAL_TYPE,(
                     *VAL_ENUMS.iter().find(|(_,type_name)|{
                         type_name == &second
                     }).expect(format!("Type {} is not a Value",second).as_str())
-                ).0.clone()
+                ).0)
             }else{
-                "_".to_string()
+                "right".to_string()
             };
 
-            code += format!("({}::{},{}::{}) => {},",
-                            VAL_ENUM_TYPE ,left_enum_variant ,
-                            VAL_ENUM_TYPE ,right_enum_variant ,
-                            x.block.to_token_stream().to_string()
-            ).as_str();
+            code += format!("({},{}) => {},", left_pat, right_pat,
+                            x.block.to_token_stream().to_string()).as_str();
         }
         code += "}";
         code += "}";
     }
+
+    println!("{}",code.to_string());
+
     return code.parse().unwrap();
 }}
 
 
+
+struct CallOpArg{
+    left:Expr,
+    comma1:Comma,
+    op:Ident,
+    comma2:Comma,
+    right:Expr,
+}
+impl Parse for CallOpArg{
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let left = input.parse()?;
+        let comma1 = input.parse()?;
+        let op = input.parse()?;
+        let comma2 = input.parse()?;
+        let right = input.parse()?;
+
+        Ok(Self{
+            left,
+            comma1,
+            op,
+            right,
+            comma2
+        })
+    }
+}
+
+/// ```rust
+/// call_op!(left,OpAdd,right);
+/// ```
+#[proc_macro]
+pub fn call_binary_op(input:TokenStream) -> TokenStream{
+    let args:CallOpArg = syn::parse(input).unwrap();
+    let fn_name = args.op.to_string().to_case(Case::Snake)+"_impl";
+    let code = format!("{}({},{})",fn_name,args.left.to_token_stream().to_string(),args.right.to_token_stream().to_string());
+    code.parse().unwrap()
+}

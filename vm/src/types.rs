@@ -1,8 +1,10 @@
 use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
-use macros::{val_enum_def, reg_enum_def, match_1_reg, impl_binary_ops};
+use macros::{val_enum_def, reg_enum_def, match_1_reg, impl_binary_ops, call_binary_op};
+use crate::errors;
 use crate::mem_collection::RefCount;
 use crate::util::UncheckMut;
+use crate::errors::{Error,Result};
 
 ///
 /// Value Types
@@ -34,12 +36,12 @@ pub trait RegTy{
 
     //unbox the reference into the type that can be operatee.
     #[inline(always)]
-    fn unbox_const(&self) -> Option<&Self::Output>{
-        None
+    fn unbox_const(&self) -> Result<&Self::Output>{
+        Err(errors::MutabilityError::new(false).into())
     }
 
     #[inline(always)]
-    fn unbox_mut(&self) -> Option<&mut Self::Output>{
+    fn unbox_mut(&self) -> Result<&mut Self::Output>{
         None
     }
 }
@@ -88,6 +90,7 @@ pub enum RegType{
     RefNil      (RefNil),
     ConstRefNil (ConstRefNil),
 }
+
 impl Debug for RegType{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match_1_reg!(self => a,{
@@ -98,16 +101,22 @@ impl Debug for RegType{
     }
 }
 
+impl RegType{
+
+}
+
 pub struct InlineInteger(UncheckMut<Integer>);
 
 impl RegTy for InlineInteger{
     type Output = Integer;
 
-    fn unbox_const(&self) -> Option<&Self::Output> {
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
         Some(self.0.get())
     }
 
-    fn unbox_mut(&self) -> Option<&mut Self::Output> {
+    #[inline(always)]
+    fn unbox_mut(&self) -> Result<&mut Self::Output> {
         Some(self.0.get_mut())
     }
 }
@@ -116,10 +125,13 @@ pub struct InlineFloat(UncheckMut<Float>);
 
 impl RegTy for InlineFloat {
     type Output = Float;
-    fn unbox_const(&self) -> Option<&Self::Output> {
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
         Some(self.0.get())
     }
-    fn unbox_mut(&self) -> Option<&mut Self::Output> {
+
+    #[inline(always)]
+    fn unbox_mut(&self) -> Result<&mut Self::Output> {
         Some(self.0.get_mut())
     }
 }
@@ -129,11 +141,13 @@ pub struct InlineBool(UncheckMut<Bool>);
 impl RegTy for InlineBool{
     type Output = Bool;
 
-    fn unbox_const(&self) -> Option<&Self::Output> {
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
         Some(self.0.get())
     }
 
-    fn unbox_mut(&self) -> Option<&mut Self::Output> {
+    #[inline(always)]
+    fn unbox_mut(&self) -> Result<&mut Self::Output> {
         Some(self.0.get_mut())
     }
 }
@@ -143,7 +157,8 @@ pub struct ConstInlineInteger(Integer);
 impl RegTy for ConstInlineInteger{
     type Output = Integer;
 
-    fn unbox_const(&self) -> Option<&Self::Output> {
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
         Some(&self.0)
     }
 }
@@ -152,7 +167,9 @@ pub struct ConstInlineFloat(Float);
 
 impl RegTy for ConstInlineFloat{
     type Output = Float;
-    fn unbox_const(&self) -> Option<&Self::Output> {
+
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
         Some(&self.0)
     }
 }
@@ -161,7 +178,9 @@ pub struct ConstInlineBool(Bool);
 
 impl RegTy for ConstInlineBool{
     type Output = Bool;
-    fn unbox_const(&self) -> Option<&Self::Output> {
+
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
         Some(&self.0)
     }
 }
@@ -171,11 +190,13 @@ pub struct RefInteger(UncheckMut<RefCount<Integer>>);
 impl RegTy for RefInteger{
     type Output = Integer;
 
-    fn unbox_const(&self) -> Option<&Self::Output> {
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
         Some(self.0.get())
     }
 
-    fn unbox_mut(&self) -> Option<&mut Self::Output> {
+    #[inline(always)]
+    fn unbox_mut(&self) -> Result<&mut Self::Output> {
         Some(self.0.get_mut())
     }
 }
@@ -185,11 +206,13 @@ pub struct RefFloat(UncheckMut<RefCount<Float>>);
 impl RegTy for RefFloat{
     type Output = Float;
 
-    fn unbox_const(&self) -> Option<&Self::Output> {
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
         Some(self.0.get())
     }
 
-    fn unbox_mut(&self) -> Option<&mut Self::Output> {
+    #[inline(always)]
+    fn unbox_mut(&self) -> Result<&mut Self::Output> {
         Some(self.0.get_mut())
     }
 }
@@ -199,11 +222,13 @@ pub struct RefBool(UncheckMut<RefCount<Bool>>);
 impl RegTy for RefBool{
     type Output = Bool;
 
-    fn unbox_const(&self) -> Option<&Self::Output> {
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
         Some(self.0.get())
     }
 
-    fn unbox_mut(&self) -> Option<&mut Self::Output> {
+    #[inline(always)]
+    fn unbox_mut(&self) -> Result<&mut Self::Output> {
         Some(self.0.get_mut())
     }
 }
@@ -214,7 +239,8 @@ pub struct ConstRefInteger(RefCount<Integer>);
 impl RegTy for ConstRefInteger{
     type Output = Integer;
 
-    fn unbox_const(&self) -> Option<&Self::Output> {
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
         Some(self.0.deref())
     }
 }
@@ -224,7 +250,8 @@ pub struct ConstRefFloat(RefCount<Float>);
 impl RegTy for ConstRefFloat{
     type Output = Float;
 
-    fn unbox_const(&self) -> Option<&Self::Output> {
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
         Some(self.0.deref())
     }
 }
@@ -234,7 +261,8 @@ pub struct ConstRefBool(RefCount<Bool>);
 impl RegTy for ConstRefBool{
     type Output = Bool;
 
-    fn unbox_const(&self) -> Option<&Self::Output> {
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
         Some(self.0.deref())
     }
 }
@@ -244,7 +272,8 @@ pub struct ConstInteger(RefCount<Integer>);
 impl RegTy for ConstInteger{
     type Output = Integer;
 
-    fn unbox_const(&self) -> Option<&Self::Output> {
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
         Some(self.0.deref())
     }
 }
@@ -254,7 +283,8 @@ pub struct ConstFloat(RefCount<Float>);
 impl RegTy for ConstFloat{
     type Output = Float;
 
-    fn unbox_const(&self) -> Option<&Self::Output> {
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
         Some(self.0.deref())
     }
 
@@ -265,7 +295,8 @@ pub struct ConstBool(RefCount<Bool>);
 impl RegTy for ConstBool{
     type Output = Bool;
 
-    fn unbox_const(&self) -> Option<&Self::Output> {
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
         Some(self.0.deref())
     }
 }
@@ -274,10 +305,14 @@ pub struct RefNil(UncheckMut<Nil>);
 
 impl RegTy for RefNil{
     type Output = Nil;
-    fn unbox_const(&self) -> Option<&Self::Output> {
+
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
         Some(self.0.get())
     }
-    fn unbox_mut(&self) -> Option<&mut Self::Output> {
+
+    #[inline(always)]
+    fn unbox_mut(&self) -> Result<&mut Self::Output> {
         Some(self.0.get_mut())
     }
 }
@@ -287,19 +322,142 @@ pub struct ConstRefNil(Nil);
 impl RegTy for ConstRefNil{
     type Output = Nil;
 
-    fn unbox_const(&self) -> Option<&Self::Output> {
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
         Some(&self.0)
     }
 }
-// todo impl impl_binary_ops
-// impl_binary_ops!{
-//     OpOr => {
-//         (Integer,Integer) => {
-//             RegType::InlineInteger(left + right)
-//         }
-//     },
-//
-// }
+
+impl_binary_ops!{
+    OpOr => {
+        (Integer,Integer) => {
+            Some(Value::Integer(left + right))
+        },
+        (_,_) => {
+            None
+        }
+    },
+
+    OpAnd => {
+        (_,_) => {
+            None
+        }
+    },
+
+    OpBitOr => {
+        (_,_) => {
+            None
+        }
+    },
+
+    OpBitXor => {
+
+        (_,_) => {
+            None
+        }
+    },
+
+    OpBitAnd => {
+
+        (_,_) => {
+            None
+        }
+    },
+
+    OpNe => {
+        (_,_) => {
+            None
+        }
+    },
+
+    OpEq => {
+        (_,_) => {
+            None
+        }
+    },
+
+    OpLt => {
+        (_,_) => {
+            None
+        }
+    },
+
+    OpGt => {
+        (_,_) => {
+            None
+        }
+    },
+
+    OpLe=>{
+        (_,_) => {
+            None
+        }
+    },
+
+    OpGe=>{
+        (_,_) => {
+            None
+        }
+    },
+
+    OpLMov=>{
+        (_,_) => {
+            None
+        }
+    },
+
+    OpRMov => {
+        (_,_) => {
+            None
+        }
+    },
+
+    OpAdd =>{
+        (_,_) => {
+            None
+        }
+    },
+
+    OpSub => {
+        (_,_) => {
+            None
+        }
+    },
+
+    OpMul => {
+        (_,_) => {
+            None
+        }
+    },
+
+    OpDiv => {
+        (_,_) => {
+            None
+        }
+    },
+
+    OpMod => {
+        (_,_) => {
+            None
+        }
+    },
+
+    OpFact => {
+        (_,_) => {
+            None
+        }
+    },
+
+    mut OpAssign => {
+        (_,_) => {
+            None
+        }
+    }
+}
+
+pub fn op_or(a:&RegType,b:&RegType)->Value{
+    call_binary_op!(a,OpOr,b).unwrap()
+}
 
 // impl_default!(
 //     OpOr    => {unimplemented!()},

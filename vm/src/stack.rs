@@ -3,7 +3,7 @@ use crate::types::{RegType, Value};
 use crate::util::UncheckMut;
 
 pub struct VmStack{
-    stack:UncheckMut<[RegType;65535]>,
+    stack:UncheckMut<[RegType;15000]>,
     bs:usize,
 }
 
@@ -44,6 +44,6 @@ impl Debug for VmStack{
         for x in 0..(self.bs + 256){
             writeln!(f,"{:?}",self.stack.get()[x])?
         }
-        writeln!(f,"--------------")
+        writeln!(f,"----------------------------")
     }}
 }

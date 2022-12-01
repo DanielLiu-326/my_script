@@ -5,8 +5,8 @@
 #![feature(rustc_attrs)]
 #![feature(concat_idents)]
 #![feature(portable_simd)]
+#![feature(new_uninit)]
 
-use crate::stack::VmStack;
 
 ///
 /// 虚拟机结构：
@@ -73,7 +73,7 @@ use crate::stack::VmStack;
 // use crate::vm::VM;
 
 mod opcode;
-
+mod errors;
 mod types;
 mod mem_collection;
 mod util;
@@ -81,9 +81,12 @@ mod vm;
 mod stack;
 mod const_table;
 
-fn main() {
+use crate::stack::VmStack;
+
+fn main() {unsafe{
     let stack = VmStack::default();
     println!("{:?}",stack);
+
     // let mut const_table = Vec::new();
     // let mut op_codes = Vec::new();
     //
@@ -103,4 +106,4 @@ fn main() {
     // let mut vm = VM::new(op_codes,const_table);
     // vm.run();
 
-}
+}}
