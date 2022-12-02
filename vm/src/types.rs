@@ -4,7 +4,7 @@ use macros::{val_enum_def, reg_enum_def, match_1_reg, impl_binary_ops, call_bina
 use crate::errors;
 use crate::mem_collection::RefCount;
 use crate::util::UncheckMut;
-use crate::errors::{Error,Result};
+use crate::errors::*;
 
 ///
 /// Value Types
@@ -42,7 +42,7 @@ pub trait RegTy{
 
     #[inline(always)]
     fn unbox_mut(&self) -> Result<&mut Self::Output>{
-        None
+        Err(errors::MutabilityError::new(true).into())
     }
 }
 
@@ -94,7 +94,7 @@ pub enum RegType{
 impl Debug for RegType{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match_1_reg!(self => a,{
-            write!(f,"RegType::{}({:?})",__variant__,a.unbox_const().unwrap())?;
+            write!(f,"RegType::{}({:?})",__variant__,a.unbox_const().unwrap()).unwrap();
         });
 
         Ok(())
@@ -112,12 +112,12 @@ impl RegTy for InlineInteger{
 
     #[inline(always)]
     fn unbox_const(&self) -> Result<&Self::Output> {
-        Some(self.0.get())
+        Ok(self.0.get())
     }
 
     #[inline(always)]
     fn unbox_mut(&self) -> Result<&mut Self::Output> {
-        Some(self.0.get_mut())
+        Ok(self.0.get_mut())
     }
 }
 
@@ -127,12 +127,12 @@ impl RegTy for InlineFloat {
     type Output = Float;
     #[inline(always)]
     fn unbox_const(&self) -> Result<&Self::Output> {
-        Some(self.0.get())
+        Ok(self.0.get())
     }
 
     #[inline(always)]
     fn unbox_mut(&self) -> Result<&mut Self::Output> {
-        Some(self.0.get_mut())
+        Ok(self.0.get_mut())
     }
 }
 
@@ -143,12 +143,12 @@ impl RegTy for InlineBool{
 
     #[inline(always)]
     fn unbox_const(&self) -> Result<&Self::Output> {
-        Some(self.0.get())
+        Ok(self.0.get())
     }
 
     #[inline(always)]
     fn unbox_mut(&self) -> Result<&mut Self::Output> {
-        Some(self.0.get_mut())
+        Ok(self.0.get_mut())
     }
 }
 
@@ -159,7 +159,7 @@ impl RegTy for ConstInlineInteger{
 
     #[inline(always)]
     fn unbox_const(&self) -> Result<&Self::Output> {
-        Some(&self.0)
+        Ok(&self.0)
     }
 }
 
@@ -170,7 +170,7 @@ impl RegTy for ConstInlineFloat{
 
     #[inline(always)]
     fn unbox_const(&self) -> Result<&Self::Output> {
-        Some(&self.0)
+        Ok(&self.0)
     }
 }
 
@@ -181,7 +181,7 @@ impl RegTy for ConstInlineBool{
 
     #[inline(always)]
     fn unbox_const(&self) -> Result<&Self::Output> {
-        Some(&self.0)
+        Ok(&self.0)
     }
 }
 
@@ -192,12 +192,12 @@ impl RegTy for RefInteger{
 
     #[inline(always)]
     fn unbox_const(&self) -> Result<&Self::Output> {
-        Some(self.0.get())
+        Ok(self.0.get())
     }
 
     #[inline(always)]
     fn unbox_mut(&self) -> Result<&mut Self::Output> {
-        Some(self.0.get_mut())
+        Ok(self.0.get_mut())
     }
 }
 
@@ -208,12 +208,12 @@ impl RegTy for RefFloat{
 
     #[inline(always)]
     fn unbox_const(&self) -> Result<&Self::Output> {
-        Some(self.0.get())
+        Ok(self.0.get())
     }
 
     #[inline(always)]
     fn unbox_mut(&self) -> Result<&mut Self::Output> {
-        Some(self.0.get_mut())
+        Ok(self.0.get_mut())
     }
 }
 
@@ -224,12 +224,12 @@ impl RegTy for RefBool{
 
     #[inline(always)]
     fn unbox_const(&self) -> Result<&Self::Output> {
-        Some(self.0.get())
+        Ok(self.0.get())
     }
 
     #[inline(always)]
     fn unbox_mut(&self) -> Result<&mut Self::Output> {
-        Some(self.0.get_mut())
+        Ok(self.0.get_mut())
     }
 }
 
@@ -241,7 +241,7 @@ impl RegTy for ConstRefInteger{
 
     #[inline(always)]
     fn unbox_const(&self) -> Result<&Self::Output> {
-        Some(self.0.deref())
+        Ok(self.0.deref())
     }
 }
 
@@ -252,7 +252,7 @@ impl RegTy for ConstRefFloat{
 
     #[inline(always)]
     fn unbox_const(&self) -> Result<&Self::Output> {
-        Some(self.0.deref())
+        Ok(self.0.deref())
     }
 }
 
@@ -263,7 +263,7 @@ impl RegTy for ConstRefBool{
 
     #[inline(always)]
     fn unbox_const(&self) -> Result<&Self::Output> {
-        Some(self.0.deref())
+        Ok(self.0.deref())
     }
 }
 
@@ -274,7 +274,7 @@ impl RegTy for ConstInteger{
 
     #[inline(always)]
     fn unbox_const(&self) -> Result<&Self::Output> {
-        Some(self.0.deref())
+        Ok(self.0.deref())
     }
 }
 
@@ -285,7 +285,7 @@ impl RegTy for ConstFloat{
 
     #[inline(always)]
     fn unbox_const(&self) -> Result<&Self::Output> {
-        Some(self.0.deref())
+        Ok(self.0.deref())
     }
 
 }
@@ -297,7 +297,7 @@ impl RegTy for ConstBool{
 
     #[inline(always)]
     fn unbox_const(&self) -> Result<&Self::Output> {
-        Some(self.0.deref())
+        Ok(self.0.deref())
     }
 }
 
@@ -308,12 +308,12 @@ impl RegTy for RefNil{
 
     #[inline(always)]
     fn unbox_const(&self) -> Result<&Self::Output> {
-        Some(self.0.get())
+        Ok(self.0.get())
     }
 
     #[inline(always)]
     fn unbox_mut(&self) -> Result<&mut Self::Output> {
-        Some(self.0.get_mut())
+        Ok(self.0.get_mut())
     }
 }
 
@@ -324,133 +324,158 @@ impl RegTy for ConstRefNil{
 
     #[inline(always)]
     fn unbox_const(&self) -> Result<&Self::Output> {
-        Some(&self.0)
+        Ok(&self.0)
     }
 }
 
 impl_binary_ops!{
     OpOr => {
         (Integer,Integer) => {
-            Some(Value::Integer(left + right))
+            Ok(Value::Bool(*left!=0||*right!=0))
+        },
+        (Bool,Bool) => {
+            Ok(Value::Bool(*left || *right))
         },
         (_,_) => {
-            None
+            Err(UnsupportedOp::new(__op_name__).into())
         }
     },
 
     OpAnd => {
+        (Integer,Integer) => {
+            Ok(Value::Bool(*lef!=0&&*right!=0))
+        },
+        (Bool,Bool) => {
+            Ok(Value::Bool(*left && *right))
+        },
         (_,_) => {
-            None
+            Err(UnsupportedOp::new(__op_name__).into())
         }
     },
 
     OpBitOr => {
+        (Integer,Integer) => {
+            Ok(Value::Bool(*lef!=0&&*right!=0))
+        },
+        (Bool,Bool) => {
+            Ok(Value::Bool(*left || *right))
+        },
         (_,_) => {
-            None
+            Err(UnsupportedOp::new(__op_name__).into())
         }
     },
 
     OpBitXor => {
-
+        (Bool,Bool) => {
+            Ok(Value::Bool(*left ^ *right))
+        },
         (_,_) => {
-            None
+            Err(UnsupportedOp::new(__op_name__).into())
         }
     },
 
     OpBitAnd => {
-
+        (Bool,Bool) => {
+            Ok(Value::Bool(*left && *right))
+        },
         (_,_) => {
-            None
+            Err(UnsupportedOp::new(__op_name__).into())
         }
     },
 
     OpNe => {
+        (Bool,Bool) => {
+            Ok(Value::Bool(*left != *right))
+        },
         (_,_) => {
-            None
+            Err(UnsupportedOp::new(__op_name__).into())
         }
     },
 
     OpEq => {
+        (Bool,Bool) => {
+            Ok(Value::Bool(*left == *right))
+        },
         (_,_) => {
-            None
+            Err(UnsupportedOp::new(__op_name__).into())
         }
     },
 
     OpLt => {
         (_,_) => {
-            None
+            Err(UnsupportedOp::new(__op_name__).into())
         }
     },
 
     OpGt => {
         (_,_) => {
-            None
+            Err(UnsupportedOp::new(__op_name__).into())
         }
     },
 
-    OpLe=>{
+    OpLe => {
         (_,_) => {
-            None
+            Err(UnsupportedOp::new(__op_name__).into())
         }
     },
 
     OpGe=>{
         (_,_) => {
-            None
+            Err(UnsupportedOp::new(__op_name__).into())
         }
     },
 
     OpLMov=>{
         (_,_) => {
-            None
+            Err(UnsupportedOp::new(__op_name__).into())
         }
     },
 
     OpRMov => {
         (_,_) => {
-            None
+            Err(UnsupportedOp::new(__op_name__).into())
         }
     },
 
     OpAdd =>{
         (_,_) => {
-            None
+            Err(UnsupportedOp::new(__op_name__).into())
         }
     },
 
     OpSub => {
         (_,_) => {
-            None
+            Err(UnsupportedOp::new(__op_name__).into())
         }
     },
 
     OpMul => {
         (_,_) => {
-            None
+            Err(UnsupportedOp::new(__op_name__).into())
         }
     },
 
     OpDiv => {
         (_,_) => {
-            None
+            Err(UnsupportedOp::new(__op_name__).into())
         }
     },
 
     OpMod => {
         (_,_) => {
-            None
+            Err(UnsupportedOp::new(__op_name__).into())
         }
     },
 
     OpFact => {
         (_,_) => {
-            None
+            Err(UnsupportedOp::new(__op_name__).into())
         }
     },
 
     mut OpAssign => {
         (_,_) => {
-            None
+            Err(UnsupportedOp::new(__op_name__).into())
         }
     }
 }

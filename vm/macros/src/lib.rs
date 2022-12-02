@@ -104,7 +104,7 @@ pub fn reg_enum_def(_attr:TokenStream,input:TokenStream) -> TokenStream{unsafe{
     impl_code += format!(r#"
     impl {} {{
         #[inline(always)]
-        pub fn unbox_const(&self)->Option<{}<'_>>{{
+        pub fn unbox_const(&self)->Result<{}<'_>>{{
             match self{{
                 {}
             }}
@@ -113,7 +113,7 @@ pub fn reg_enum_def(_attr:TokenStream,input:TokenStream) -> TokenStream{unsafe{
         REG_ENUM_TYPE,
         REF_VAL_TYPE,
         REG_ENUMS.iter().map(|a|{
-            format!("Self::{}(a) => Some(a.unbox_const()?.into()),",
+            format!("Self::{}(a) => Ok(a.unbox_const()?.into()),",
                     (*a).0
             )
         }).reduce(|a,n|{a+&n}).unwrap()
@@ -121,7 +121,7 @@ pub fn reg_enum_def(_attr:TokenStream,input:TokenStream) -> TokenStream{unsafe{
 
     impl_code += format!(r#"
         #[inline(always)]
-        pub fn unbox_mut(&self)->Option<{}<'_>>{{
+        pub fn unbox_mut(&self)->Result<{}<'_>>{{
             match self{{
                 {}
             }}
@@ -129,7 +129,7 @@ pub fn reg_enum_def(_attr:TokenStream,input:TokenStream) -> TokenStream{unsafe{
     "#,
         REF_MUT_VAL_TYPE,
         REG_ENUMS.iter().map(|a|{
-            format!("Self::{}(a) => Some(a.unbox_mut()?.into()),",(*a).0)
+            format!("Self::{}(a) => Ok(a.unbox_mut()?.into()),",(*a).0)
         }).reduce(|a,n|{a+&n}).unwrap()
     ).as_str();
 
@@ -292,7 +292,7 @@ pub fn impl_binary_ops(input:TokenStream) -> TokenStream{unsafe{
         };
 
         code += "#[inline(always)]";
-        code += format!("pub fn {}_impl(left:&{},right:&{}) -> Option<{}> {{",
+        code += format!("pub fn {}_impl(left:&{},right:&{}) -> Result<{}> {{",
                         y.ident.to_string().to_case(Case::Snake),
                         REG_ENUM_TYPE,
                         REG_ENUM_TYPE,
@@ -330,7 +330,8 @@ pub fn impl_binary_ops(input:TokenStream) -> TokenStream{unsafe{
                 "right".to_string()
             };
 
-            code += format!("({},{}) => {},", left_pat, right_pat,
+            code += format!("({},{}) => {{ const __op_name__:&'static str = \"{}\"; {} }},",
+                            left_pat, right_pat, y.ident.to_string(),
                             x.block.to_token_stream().to_string()).as_str();
         }
         code += "}";
