@@ -27,6 +27,18 @@ pub enum Value{
     Bool(Bool),
     Nil(Nil),
 }
+impl Value{
+    #[inline(always)]
+    fn load_variable(&self,mutable:bool)->RegType{
+        match (self,mutable){
+
+        }
+    }
+    #[inline(always)]
+    fn load_constant(&self)->RegType{
+
+    }
+}
 
 ///
 /// Register Types
@@ -101,8 +113,10 @@ impl Debug for RegType{
     }
 }
 
-impl RegType{
-
+impl Default for RegType{
+    fn default() -> Self {
+        Self::RefNil(RefNil(UncheckMut::new(Nil())))
+    }
 }
 
 pub struct InlineInteger(UncheckMut<Integer>);
@@ -151,6 +165,8 @@ impl RegTy for InlineBool{
         Ok(self.0.get_mut())
     }
 }
+
+
 
 pub struct ConstInlineInteger(Integer);
 
@@ -330,158 +346,385 @@ impl RegTy for ConstRefNil{
 
 impl_binary_ops!{
     OpOr => {
-        (Integer,Integer) => {
-            Ok(Value::Bool(*left!=0||*right!=0))
-        },
-        (Bool,Bool) => {
-            Ok(Value::Bool(*left || *right))
-        },
-        (_,_) => {
-            Err(UnsupportedOp::new(__op_name__).into())
-        }
+        //
+        // Integer
+        //
+        (Integer,Integer)   => Ok(Value::Bool(*left != 0 || *right != 0)),
+        (Integer,Float)     => Ok(Value::Bool(*left != 0 || *right != 0f64)),
+        (Integer,Bool)      => Ok(Value::Bool(*left != 0 || *right)),
+
+        //
+        // Float
+        //
+        (Float,Integer) => Ok(Value::Bool(*left != 0f64 || *right != 0)),
+        (Float,Float)   => Ok(Value::Bool(*left != 0f64 || *right != 0f64)),
+        (Float,Bool)    => Ok(Value::Bool(*left != 0f64 || *right)),
+
+        //
+        // Bool
+        //
+        (Bool,Integer)  => Ok(Value::Bool(*left || *right != 0)),
+        (Bool,Bool)     => Ok(Value::Bool(*left || *right)),
+        (Bool,Float)    => Ok(Value::Bool(*left || *right != 0f64)),
+
+        //
+        // Default
+        //
+        (_,_) => Err(UnsupportedOp::new(__op_name__).into())
     },
 
     OpAnd => {
-        (Integer,Integer) => {
-            Ok(Value::Bool(*lef!=0&&*right!=0))
-        },
-        (Bool,Bool) => {
-            Ok(Value::Bool(*left && *right))
-        },
+        //
+        // Integer
+        //
+        (Integer,Integer)   => Ok(Value::Bool(*left != 0 && *right != 0)),
+        (Integer,Float)     => Ok(Value::Bool(*left != 0 && *right != 0f64)),
+        (Integer,Bool)      => Ok(Value::Bool(*left != 0 && *right)),
+
+        //
+        // Float
+        //
+        (Float,Integer) => Ok(Value::Bool(*left != 0f64 && *right != 0)),
+        (Float,Float)   => Ok(Value::Bool(*left != 0f64 && *right != 0f64)),
+        (Float,Bool)    => Ok(Value::Bool(*left != 0f64 && *right)),
+
+        //
+        // Bool
+        //
+        (Bool,Integer)  => Ok(Value::Bool(*left && *right != 0)),
+        (Bool,Float)    => Ok(Value::Bool(*left && *right != 0f64)),
+        (Bool,Bool)     => Ok(Value::Bool(*left && *right )),
+
         (_,_) => {
             Err(UnsupportedOp::new(__op_name__).into())
         }
     },
 
     OpBitOr => {
-        (Integer,Integer) => {
-            Ok(Value::Bool(*lef!=0&&*right!=0))
-        },
-        (Bool,Bool) => {
-            Ok(Value::Bool(*left || *right))
-        },
-        (_,_) => {
-            Err(UnsupportedOp::new(__op_name__).into())
-        }
+        //
+        // Integer
+        //
+        (Integer,Integer)   => Ok(Value::Integer(*left | *right)),
+
+        //
+        // Bool
+        //
+        (Bool,Bool) => Ok(Value::Bool(*left || *right)),
+
+        //
+        // Default
+        //
+        (_,_) => Err(UnsupportedOp::new(__op_name__).into()),
     },
 
     OpBitXor => {
-        (Bool,Bool) => {
-            Ok(Value::Bool(*left ^ *right))
-        },
-        (_,_) => {
-            Err(UnsupportedOp::new(__op_name__).into())
-        }
+        //
+        // Integer
+        //
+        (Integer,Integer) => Ok(Value::Integer(*left ^ *right)),
+
+        //
+        // Bool
+        //
+        (Bool,Bool) => Ok(Value::Bool(*left ^ *right)),
+
+        //
+        // Default
+        //
+        (_,_) => Err(UnsupportedOp::new(__op_name__).into()),
     },
 
     OpBitAnd => {
-        (Bool,Bool) => {
-            Ok(Value::Bool(*left && *right))
-        },
-        (_,_) => {
-            Err(UnsupportedOp::new(__op_name__).into())
-        }
+        //
+        // Integer
+        //
+        (Integer,Integer) => Ok(Value::Integer(*left & *right)),
+
+        //
+        // Bool
+        //
+        (Bool,Bool) => Ok(Value::Bool(*left && *right)),
+
+        //
+        // Default
+        //
+        (_,_) => Err(UnsupportedOp::new(__op_name__).into()),
     },
 
     OpNe => {
-        (Bool,Bool) => {
-            Ok(Value::Bool(*left != *right))
-        },
-        (_,_) => {
-            Err(UnsupportedOp::new(__op_name__).into())
-        }
+        //
+        // Integer
+        //
+        (Integer,Integer)   => Ok(Value::Bool(*left != *right)),
+        (Integer,Float)     => Ok(Value::Bool(*left as Float != *right)),
+
+        //
+        // Float
+        //
+        (Float,Float)   => Ok(Value::Bool(*left != *right)),
+
+        //
+        // Bool
+        //
+        (Bool,Bool)     => Ok(Value::Bool(*left != *right)),
+
+        //
+        // Default
+        //
+        (_,_) => Err(UnsupportedOp::new(__op_name__).into()),
     },
 
     OpEq => {
-        (Bool,Bool) => {
-            Ok(Value::Bool(*left == *right))
-        },
-        (_,_) => {
-            Err(UnsupportedOp::new(__op_name__).into())
-        }
+        //
+        // Integer
+        //
+        (Integer,Integer)   => Ok(Value::Bool(*left == *right)),
+        (Integer,Float)     => Ok(Value::Bool((*left as Float) == *right)),
+
+        //
+        // Float
+        //
+        (Float,Integer) => Ok(Value::Bool(*left == *right as Float)),
+        (Float,Float)   => Ok(Value::Bool(*left == *right)),
+
+        //
+        // Bool
+        //
+        (Bool,Bool) => Ok(Value::Bool(*left == *right)),
+
+        //
+        // Default
+        //
+        (_,_) => Err(UnsupportedOp::new(__op_name__).into()),
     },
 
     OpLt => {
-        (_,_) => {
-            Err(UnsupportedOp::new(__op_name__).into())
-        }
+        //
+        // Integer
+        //
+        (Integer,Integer)   => Ok(Value::Bool(*left < *right)),
+        (Integer,Float)     => Ok(Value::Bool((*left as Float) < *right)),
+
+        //
+        // Float
+        //
+        (Float,Integer) => Ok(Value::Bool(*left < *right as Float)),
+        (Float,Float)   => Ok(Value::Bool(*left < *right)),
+
+        //
+        // Default
+        //
+        (_,_) => Err(UnsupportedOp::new(__op_name__).into()),
     },
 
     OpGt => {
-        (_,_) => {
-            Err(UnsupportedOp::new(__op_name__).into())
-        }
+        //
+        // Integer
+        //
+        (Integer,Integer)   => Ok(Value::Bool(*left > *right)),
+        (Integer,Float)     => Ok(Value::Bool((*left as Float) > *right)),
+
+        //
+        // Float
+        //
+        (Float,Float)   => Ok(Value::Bool(*left > *right)),
+        (Float,Integer) => Ok(Value::Bool(*left > *right as Float)),
+
+        //
+        // Default
+        //
+        (_,_) => Err(UnsupportedOp::new(__op_name__).into()),
     },
 
     OpLe => {
-        (_,_) => {
-            Err(UnsupportedOp::new(__op_name__).into())
-        }
+
+        //
+        // Integer
+        //
+        (Integer,Integer) => Ok(Value::Bool(*left <= *right)),
+
+        //
+        // Float
+        //
+        (Float,Float) => Ok(Value::Bool(*left < *right)),
+
+        //
+        // Default
+        //
+        (_,_) => Err(UnsupportedOp::new(__op_name__).into()),
     },
 
     OpGe=>{
-        (_,_) => {
-            Err(UnsupportedOp::new(__op_name__).into())
-        }
+        //
+        // Integer
+        //
+        (Integer,Integer) => Ok(Value::Bool(*left >= *right)),
+
+        //
+        // Float
+        //
+        (Float,Float) => Ok(Value::Bool(*left >= *right)),
+
+        //
+        // Default
+        //
+        (_,_) => Err(UnsupportedOp::new(__op_name__).into()),
     },
 
     OpLMov=>{
-        (_,_) => {
-            Err(UnsupportedOp::new(__op_name__).into())
-        }
+        //
+        // Integer
+        //
+        (Integer,Integer) => Ok(Value::Integer(*left << *right)),
+
+        //
+        // Default
+        //
+        (_,_) => Err(UnsupportedOp::new(__op_name__).into()),
     },
 
     OpRMov => {
-        (_,_) => {
-            Err(UnsupportedOp::new(__op_name__).into())
-        }
+        //
+        // Integer
+        //
+        (Integer,Integer) => Ok(Value::Integer(*left >> *right)),
+
+        //
+        // Default
+        //
+        (_,_) => Err(UnsupportedOp::new(__op_name__).into()),
     },
 
     OpAdd =>{
-        (_,_) => {
-            Err(UnsupportedOp::new(__op_name__).into())
-        }
+        //
+        // Integer
+        //
+        (Integer,Integer)   => Ok(Value::Integer(*left + *right)),
+        (Integer,Float)     => Ok(Value::Float((*left as Float) + *right)),
+
+        //
+        //Float
+        //
+        (Float,Float)   => Ok(Value::Float(*left + *right)),
+        (Float,Integer) => Ok(Value::Float(*left + *right as Float)),
+
+        //
+        // Default
+        //
+        (_,_) => Err(UnsupportedOp::new(__op_name__).into()),
     },
 
     OpSub => {
-        (_,_) => {
-            Err(UnsupportedOp::new(__op_name__).into())
-        }
+        //
+        // Integer
+        //
+        (Integer,Integer) => Ok(Value::Integer(*left - *right)),
+        (Integer,Float)   => Ok(Value::Float((*left as Float) - *right)),
+
+        //
+        // Float
+        //
+        (Float,Integer) => Ok(Value::Float(*left - *right as Float)),
+        (Float,Float)   => Ok(Value::Float(*left - *right)),
+
+        //
+        // Default
+        //
+        (_,_) => Err(UnsupportedOp::new(__op_name__).into()),
     },
 
     OpMul => {
-        (_,_) => {
-            Err(UnsupportedOp::new(__op_name__).into())
-        }
+        //
+        // Integer
+        //
+        (Integer,Integer)   => Ok(Value::Integer(*left * *right)),
+        (Integer,Float)     => Ok(Value::Float((*left as Float) * *right)),
+
+        //
+        // Float
+        //
+        (Float,Integer) => Ok(Value::Float(*left * *right as Float)),
+        (Float,Float)   => Ok(Value::Float(*left * *right)),
+
+        //
+        // Default
+        //
+        (_,_) => Err(UnsupportedOp::new(__op_name__).into()),
     },
 
     OpDiv => {
-        (_,_) => {
-            Err(UnsupportedOp::new(__op_name__).into())
-        }
+        //
+        // Integer
+        //
+        (Integer,Integer)   => Ok(Value::Integer(*left / *right)),
+        (Integer,Float)     => Ok(Value::Float((*left as Float) / *right)),
+
+        //
+        // Float
+        //
+        (Float,Integer) => Ok(Value::Float(*left / *right as Float)),
+        (Float,Float)   => Ok(Value::Float(*left / *right)),
+
+        (_,_) => Err(UnsupportedOp::new(__op_name__).into()),
     },
 
     OpMod => {
-        (_,_) => {
-            Err(UnsupportedOp::new(__op_name__).into())
-        }
+        //
+        // Integer
+        //
+        (Integer,Integer) => Ok(Value::Integer(*left % *right)),
+
+        //
+        // Default
+        //
+        (_,_) => Err(UnsupportedOp::new(__op_name__).into()),
     },
 
     OpFact => {
-        (_,_) => {
-            Err(UnsupportedOp::new(__op_name__).into())
-        }
+        //
+        // Default
+        //
+        (_,_) => Err(UnsupportedOp::new(__op_name__).into()),
     },
 
     mut OpAssign => {
-        (_,_) => {
-            Err(UnsupportedOp::new(__op_name__).into())
-        }
+        //
+        // Default
+        //
+        (_,_) => Err(UnsupportedOp::new(__op_name__).into()),
     }
 }
 
 pub fn op_or(a:&RegType,b:&RegType)->Value{
     call_binary_op!(a,OpOr,b).unwrap()
+}
+
+pub fn op_and(a:&RegType,b:&RegType)->Value{
+    call_binary_op!(a,OpAnd,b).unwrap()
+}
+
+pub fn op_bit_or(a:&RegType,b:&RegType)->Value{
+    call_binary_op!(a,OpBitOr,b).unwrap()
+}
+
+pub fn op_bit_xor(a:&RegType,b:&RegType)->Value{
+    call_binary_op!(a,OpBitXor,b).unwrap()
+}
+
+pub fn op_bit_and(a:&RegType,b:&RegType)->Value{
+    call_binary_op!(a,OpBitAnd,b).unwrap()
+}
+
+pub fn op_ne(a:&RegType,b:&RegType)->Value{
+    call_binary_op!(a,OpBitAnd,b).unwrap()
+}
+
+pub fn op_eq(a:&RegType,b:&RegType)->Value{
+    call_binary_op!(a,OpBitAnd,b).unwrap()
+}
+
+pub fn op_lt(a:&RegType,b:&RegType)->Value{
+    call_binary_op!(a,OpBitAnd,b).unwrap()
 }
 
 // impl_default!(

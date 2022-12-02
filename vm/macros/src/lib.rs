@@ -193,7 +193,7 @@ pub fn match_1_reg(input:TokenStream)->TokenStream{unsafe{
 struct BinaryOpBody{
     pat:PatTuple,
     fat_arrow:FatArrow,
-    block:Block,
+    expr:Expr,
 }
 impl Parse for BinaryOpBody{
     fn parse(input: ParseStream) -> syn::Result<Self> {
@@ -222,7 +222,7 @@ impl Parse for BinaryOpBody{
         Ok(Self{
             pat,
             fat_arrow,
-            block
+            expr: block
         })
     }
 }
@@ -332,7 +332,7 @@ pub fn impl_binary_ops(input:TokenStream) -> TokenStream{unsafe{
 
             code += format!("({},{}) => {{ const __op_name__:&'static str = \"{}\"; {} }},",
                             left_pat, right_pat, y.ident.to_string(),
-                            x.block.to_token_stream().to_string()).as_str();
+                            x.expr.to_token_stream().to_string()).as_str();
         }
         code += "}";
         code += "}";

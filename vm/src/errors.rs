@@ -3,6 +3,7 @@ use std::fmt::{Debug, Formatter};
 pub struct MutabilityError(bool);
 
 impl MutabilityError{
+    #[inline(always)]
     pub fn new(mutable:bool)->Self{
         Self(mutable)
     }
@@ -18,6 +19,7 @@ impl Debug for MutabilityError{
     }
 }
 impl Into<Error> for MutabilityError{
+    #[inline(always)]
     fn into(self) -> Error {
         Error::MutabilityError(self)
     }
@@ -26,6 +28,7 @@ impl Into<Error> for MutabilityError{
 pub struct UnsupportedOp(&'static str);
 
 impl UnsupportedOp{
+    #[inline(always)]
     pub fn new(op_name:&'static str)->Self{
         Self(op_name)
     }
@@ -38,6 +41,7 @@ impl Debug for UnsupportedOp {
 }
 
 impl Into<Error> for UnsupportedOp{
+    #[inline(always)]
     fn into(self) -> Error {
         Error::UnsupportedOp(self)
     }
