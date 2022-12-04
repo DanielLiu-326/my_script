@@ -3,7 +3,7 @@ extern crate core;
 use proc_macro::{ TokenStream};
 use convert_case::{Case, Casing};
 use syn::token::{Comma, FatArrow};
-use syn::{Block, braced, Token, ItemEnum, Expr, Ident, PatTuple, Pat};
+use syn::{Block, braced, Token, ItemEnum, Expr, Ident, PatTuple, Pat, PatType};
 use syn::__private::ToTokens;
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
@@ -190,30 +190,28 @@ pub fn match_1_reg(input:TokenStream)->TokenStream{unsafe{
 
 }}
 
-struct BinaryOpBody{
+struct OpBody {
     pat:PatTuple,
     fat_arrow:FatArrow,
     expr:Expr,
 }
-impl Parse for BinaryOpBody{
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-
-        let pat = if let Pat::Tuple(tuple) = input.parse()?{
-            if tuple.elems.iter().count()!=2{
-                Err(syn::Error::new(
-                    tuple.span(),
-                    "Must be a two-element tuple pattern such as (LeftType,RightType)!"
-                ))
-            }else{
-                Ok(tuple)
-            }
-        }else{
+fn parse_pat_tuple(input:&ParseStream) ->syn::Result<PatTuple>{
+    match input.parse::<Pat>()?{
+        Pat::Tuple(tup) => {
+            Ok(tup)
+        },
+        _ => {
             Err(syn::Error::new(
                 input.span(),
-                "Must be a two-element tuple pattern such as (LeftType,RightType)!"
-            ))
-        }?;
+                "Must be a tuple pattern!")
+            )
+        }
+    }
+}
+impl Parse for OpBody {
 
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let pat = parse_pat_tuple(&input)?;
         let fat_arrow = input.parse()?;
         let block = input.parse()?;
         if pat.elems.iter().count()!=2{
@@ -227,14 +225,14 @@ impl Parse for BinaryOpBody{
     }
 }
 
-struct ImplBinaryOp{
+struct ImplOp {
     mutbility:Option<syn::token::Mut>,
     ident:syn::Ident,
     fat_arrow:FatArrow,
     brace: syn::token::Brace,
-    bodies:Punctuated<BinaryOpBody,Token![,]>,
+    bodies:Punctuated<OpBody,Token![,]>,
 }
-impl Parse for ImplBinaryOp{
+impl Parse for ImplOp {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let content;
         let mutbility = input.parse()?;
@@ -253,10 +251,10 @@ impl Parse for ImplBinaryOp{
     }
 }
 
-struct ImplBinaryOps{
-    ops:Punctuated<ImplBinaryOp,Token![,]>,
+struct ImplOps {
+    ops:Punctuated<ImplOp,Token![,]>,
 }
-impl Parse for ImplBinaryOps{
+impl Parse for ImplOps {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let ops = Punctuated::parse_terminated(input)?;
         Ok(Self{
@@ -280,7 +278,7 @@ impl Parse for ImplBinaryOps{
 /// ```
 #[proc_macro]
 pub fn impl_binary_ops(input:TokenStream) -> TokenStream{unsafe{
-    let input:ImplBinaryOps = syn::parse(input).unwrap();
+    let input: ImplOps = syn::parse(input).unwrap();
     let mut code = String::new();
     let mut mutibility = false;
     for y in input.ops {
@@ -377,6 +375,35 @@ impl Parse for CallOpArg{
 pub fn call_binary_op(input:TokenStream) -> TokenStream{
     let args:CallOpArg = syn::parse(input).unwrap();
     let fn_name = args.op.to_string().to_case(Case::Snake)+"_impl";
-    let code = format!("{}({},{})",fn_name,args.left.to_token_stream().to_string(),args.right.to_token_stream().to_string());
+    let code = format!("{}({},{})",
+                       fn_name,args.left.to_token_stream().to_string(),
+                       args.right.to_token_stream().to_string()
+    );
+
     code.parse().unwrap()
 }
+
+//
+// /// ```rust
+// /// use macros::impl_unary_ops;
+// /// impl_unary_ops!{
+// ///     OpNeg => {
+// ///         (Integer) => {
+// ///             Value::Integer(~right)
+// ///         }
+// ///     }
+// /// }
+// /// ```
+//
+// #[proc_macro]
+// pub fn impl_unary_ops(input:TokenStream) -> TokenStream{
+//     let ops:ImplOps = syn::parse(input).unwrap();
+//     let code = String::new();
+//     for op in ops.ops{
+//         let mutability = op.mutbility.is_some();
+//         for arm in op.bodies{
+//
+//         }
+//     }
+//
+// }

@@ -1,4 +1,4 @@
-use crate::types::{Value};
+use crate::types::{RegType, Value};
 
 pub type ConstAddr = u16;
 
@@ -9,26 +9,23 @@ pub struct ConstTable{
 
 impl ConstTable{
     pub fn new(consts:Vec<Value>)->Self{
-        Self{
-            consts
-        }
+        Self{consts}
     }
 
-    /// create object  and return it's const reference
     #[inline(always)]
-    pub fn load_const_ref(&self, offset:ConstAddr) -> Value{
-        self.consts[offset as usize].load_const_ref()
+    pub fn push_constant(&mut self,constant:Value){
+        self.consts.push(constant)
     }
 
     /// create object  and return it's mutable reference
     #[inline(always)]
-    pub fn load_mut_ref(&self,offset:ConstAddr) -> Value{
-        self.consts[offset as usize].load_mut_ref()
+    pub fn load_variable(&self,offset:ConstAddr,is_mut:bool) -> RegType{
+        self.consts[offset as usize].load_variable(is_mut)
     }
 
     /// create constant
     #[inline(always)]
-    pub fn load_const(&self, offset:ConstAddr) -> Value {
-        self.consts[offset as usize].load_const()
+    pub fn load_const(&self, offset:ConstAddr) -> RegType {
+        self.consts[offset as usize].load_constant()
     }
 }

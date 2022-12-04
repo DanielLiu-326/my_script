@@ -1,22 +1,22 @@
 
 #[derive(Debug)]
-pub struct Sentences<'input>{
-    pub sentences:Vec<Sentence<'input>>,
+pub struct Stmts<'input>{
+    pub stmts:Vec<Stmt<'input>>,
 }
 #[derive(Debug)]
-pub enum Sentence<'input>{
-    IfSentence(Expr<'input>,Box<Sentence<'input>>,Option<Box<Sentence<'input>>>),
-    EmptySentence,
-    ValueAssignSentence(Expr<'input>,Expr<'input>),
-    ReferenceAssignSentence(Expr<'input>,Expr<'input>),
-    NormalSentence(Expr<'input>),
-    WhileSentence(Expr<'input>,Box<Sentence<'input>>),
-    LoopSentence(Box<Sentence<'input>>),
-    BlockSentence(Sentences<'input>),
-    RefDefineSentence(RefDefine<'input>,Expr<'input>),
-    BreakSentence,
-    ContinueSentence,
-    ReturnSentence(Expr<'input>),
+pub enum Stmt<'input>{
+    IfStmt(Expr<'input>,Box<Stmt<'input>>,Option<Box<Stmt<'input>>>),
+    EmptyStmt,
+    ValueAssignStmt(Expr<'input>,Expr<'input>),
+    ReferenceAssignStmt(Expr<'input>,Expr<'input>),
+    NormalStmt(Expr<'input>),
+    WhileStmt(Expr<'input>,Box<Stmt<'input>>),
+    LoopStmt(Box<Stmt<'input>>),
+    BlockStmt(Stmts<'input>),
+    RefDefineStmt(RefDefine<'input>,Expr<'input>),
+    BreakStmt,
+    ContinueStmt,
+    ReturnStmt(Expr<'input>),
 }
 #[derive(Debug)]
 pub struct RefDefine<'input>{
@@ -24,6 +24,7 @@ pub struct RefDefine<'input>{
     pub is_mutable:bool,
     pub ident:&'input str,
 }
+
 #[derive(Debug)]
 pub enum Expr<'input>{
     Ident(&'input str),
@@ -35,6 +36,7 @@ pub enum Expr<'input>{
     Value(Value<'input>),
     Brace(Box<Expr<'input>>),
 }
+
 #[derive(Debug)]
 pub struct ArgumentList<'input>{
     pub args:Vec<Expr<'input>>,
@@ -90,10 +92,11 @@ pub enum Value<'input>{
     Function(Function<'input>),
     //todo string type
 }
+
 #[derive(Debug)]
 pub struct Function<'input>{
     pub params:ParamList<'input>,
-    pub body:Sentences<'input>,
+    pub body:Stmts<'input>,
     pub return_is_mutable:bool,
 }
 

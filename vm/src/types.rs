@@ -16,7 +16,7 @@ pub type Float      = f64;
 
 pub type Bool       = bool;
 
-#[derive(Debug)]
+#[derive(Debug,Clone,Copy)]
 pub struct Nil();
 
 #[val_enum_def]
@@ -29,14 +29,53 @@ pub enum Value{
 }
 impl Value{
     #[inline(always)]
-    fn load_variable(&self,mutable:bool)->RegType{
-        match (self,mutable){
+    pub fn load_variable(&self,mutable:bool)->RegType{
+        match (self,mutable) {
+            (Value::Integer(val),true) => {
+                RegType::InlineInteger(InlineInteger::new(*val))
+            },
+            (Value::Integer(val),false) => {
+                RegType::ConstInlineInteger(ConstInlineInteger::new(*val))
+            },
 
+            (Value::Float(val),true) => {
+                RegType::InlineFloat(InlineFloat::new(*val))
+            },
+            (Value::Float(val),false) => {
+                RegType::ConstInlineFloat(ConstInlineFloat::new(*val))
+            },
+
+            (Value::Bool(val) ,true) => {
+                RegType::InlineBool(InlineBool::new(*val))
+            },
+            (Value::Bool(val),false) => {
+                RegType::ConstInlineBool(ConstInlineBool::new(*val))
+            },
+
+            (Value::Nil(val) ,true) => {
+                RegType::RefNil(RefNil::new(*val))
+            },
+            (Value::Nil(val),false) => {
+                RegType::ConstRefNil(ConstRefNil::new(*val))
+            }
         }
     }
     #[inline(always)]
-    fn load_constant(&self)->RegType{
-
+    pub fn load_constant(&self)->RegType{
+        match self{
+            Value::Integer(val) => {
+                RegType::ConstInteger(ConstInteger::new(*val))
+            }
+            Value::Float(val) => {
+                RegType::ConstFloat(ConstFloat::new(*val))
+            }
+            Value::Bool(val) => {
+                RegType::ConstBool(ConstBool::new(*val))
+            }
+            Value::Nil(val) => {
+                RegType::ConstRefNil(ConstRefNil::new(*val))
+            }
+        }
     }
 }
 
@@ -106,7 +145,7 @@ pub enum RegType{
 impl Debug for RegType{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match_1_reg!(self => a,{
-            write!(f,"RegType::{}({:?})",__variant__,a.unbox_const().unwrap()).unwrap();
+            write!(f,"RegType::{}({:?})",__variant__,a.unbox_const().unwrap())?;
         });
 
         Ok(())
@@ -115,11 +154,17 @@ impl Debug for RegType{
 
 impl Default for RegType{
     fn default() -> Self {
-        Self::RefNil(RefNil(UncheckMut::new(Nil())))
+        Self::RefNil(RefNil::new(Nil()))
     }
 }
 
 pub struct InlineInteger(UncheckMut<Integer>);
+
+impl InlineInteger{
+    pub fn new(val:Integer) -> Self{
+        Self(UncheckMut::new(val))
+    }
+}
 
 impl RegTy for InlineInteger{
     type Output = Integer;
@@ -137,6 +182,12 @@ impl RegTy for InlineInteger{
 
 pub struct InlineFloat(UncheckMut<Float>);
 
+impl InlineFloat{
+    pub fn new(val:Float) -> Self{
+        Self(UncheckMut::new(val))
+    }
+}
+
 impl RegTy for InlineFloat {
     type Output = Float;
     #[inline(always)]
@@ -152,6 +203,12 @@ impl RegTy for InlineFloat {
 
 pub struct InlineBool(UncheckMut<Bool>);
 
+impl InlineBool{
+    pub fn new(val:Bool) -> Self{
+        Self(UncheckMut::new(val))
+    }
+}
+
 impl RegTy for InlineBool{
     type Output = Bool;
 
@@ -166,9 +223,13 @@ impl RegTy for InlineBool{
     }
 }
 
-
-
 pub struct ConstInlineInteger(Integer);
+
+impl ConstInlineInteger{
+    pub fn new(val:Integer) -> Self{
+        Self(val)
+    }
+}
 
 impl RegTy for ConstInlineInteger{
     type Output = Integer;
@@ -181,6 +242,12 @@ impl RegTy for ConstInlineInteger{
 
 pub struct ConstInlineFloat(Float);
 
+impl ConstInlineFloat {
+    pub fn new(val:Float)->Self{
+        Self::new(val)
+    }
+}
+
 impl RegTy for ConstInlineFloat{
     type Output = Float;
 
@@ -191,6 +258,12 @@ impl RegTy for ConstInlineFloat{
 }
 
 pub struct ConstInlineBool(Bool);
+
+impl ConstInlineBool{
+    pub fn new(val:Bool)->Self{
+        Self(val)
+    }
+}
 
 impl RegTy for ConstInlineBool{
     type Output = Bool;
@@ -283,41 +356,65 @@ impl RegTy for ConstRefBool{
     }
 }
 
-pub struct ConstInteger(RefCount<Integer>);
+pub struct ConstInteger(Integer);
+
+impl ConstInteger{
+    pub fn new(val:Integer)->Self{
+        Self(val)
+    }
+}
 
 impl RegTy for ConstInteger{
     type Output = Integer;
 
     #[inline(always)]
     fn unbox_const(&self) -> Result<&Self::Output> {
-        Ok(self.0.deref())
+        Ok(&self.0)
     }
 }
 
-pub struct ConstFloat(RefCount<Float>);
+pub struct ConstFloat(Float);
+
+impl ConstFloat{
+    pub fn new(val:Float) ->Self {
+        Self(val)
+    }
+}
 
 impl RegTy for ConstFloat{
     type Output = Float;
 
     #[inline(always)]
     fn unbox_const(&self) -> Result<&Self::Output> {
-        Ok(self.0.deref())
+        Ok(&self.0)
     }
 
 }
 
-pub struct ConstBool(RefCount<Bool>);
+pub struct ConstBool(Bool);
+
+impl ConstBool{
+    pub fn new(val:Bool) -> Self{
+        Self(val)
+    }
+}
 
 impl RegTy for ConstBool{
     type Output = Bool;
 
     #[inline(always)]
     fn unbox_const(&self) -> Result<&Self::Output> {
-        Ok(self.0.deref())
+        Ok(&self.0)
     }
 }
 
 pub struct RefNil(UncheckMut<Nil>);
+
+impl RefNil{
+    pub fn new(val:Nil) -> Self{
+        Self(UncheckMut::new(val))
+    }
+}
 
 impl RegTy for RefNil{
     type Output = Nil;
@@ -334,6 +431,12 @@ impl RegTy for RefNil{
 }
 
 pub struct ConstRefNil(Nil);
+
+impl ConstRefNil{
+    pub fn new(val:Nil) -> Self{
+        Self(val)
+    }
+}
 
 impl RegTy for ConstRefNil{
     type Output = Nil;
@@ -716,15 +819,59 @@ pub fn op_bit_and(a:&RegType,b:&RegType)->Value{
 }
 
 pub fn op_ne(a:&RegType,b:&RegType)->Value{
-    call_binary_op!(a,OpBitAnd,b).unwrap()
+    call_binary_op!(a,OpNe,b).unwrap()
 }
 
 pub fn op_eq(a:&RegType,b:&RegType)->Value{
-    call_binary_op!(a,OpBitAnd,b).unwrap()
+    call_binary_op!(a,OpEq,b).unwrap()
 }
 
 pub fn op_lt(a:&RegType,b:&RegType)->Value{
-    call_binary_op!(a,OpBitAnd,b).unwrap()
+    call_binary_op!(a,OpLt,b).unwrap()
+}
+
+pub fn op_gt(a:&RegType,b:&RegType)->Value{
+    call_binary_op!(a,OpGt,b).unwrap()
+}
+
+pub fn op_le(a:&RegType,b:&RegType)->Value{
+    call_binary_op!(a,OpLe,b).unwrap()
+}
+
+pub fn op_ge(a:&RegType,b:&RegType)->Value{
+    call_binary_op!(a,OpGe,b).unwrap()
+}
+
+pub fn op_l_mov(a:&RegType,b:&RegType)->Value{
+    call_binary_op!(a,OpLMov,b).unwrap()
+}
+
+pub fn op_r_mov(a:&RegType,b:&RegType)->Value{
+    call_binary_op!(a,OpRMov,b).unwrap()
+}
+
+pub fn op_add(a:&RegType,b:&RegType)->Value{
+    call_binary_op!(a,OpAdd,b).unwrap()
+}
+
+pub fn op_sub(a:&RegType,b:&RegType)->Value{
+    call_binary_op!(a,OpSub,b).unwrap()
+}
+
+pub fn op_mul(a:&RegType,b:&RegType)->Value{
+    call_binary_op!(a,OpMul,b).unwrap()
+}
+
+pub fn op_div(a:&RegType,b:&RegType)->Value{
+    call_binary_op!(a,OpDiv,b).unwrap()
+}
+
+pub fn op_mod(a:&RegType,b:&RegType)->Value{
+    call_binary_op!(a,OpMod,b).unwrap()
+}
+
+pub fn op_fact(a:&RegType,b:&RegType)->Value{
+    call_binary_op!(a,OpFact,b).unwrap()
 }
 
 // impl_default!(

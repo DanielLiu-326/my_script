@@ -11,7 +11,7 @@ impl Default for VmStack{
     fn default() -> Self {
         unsafe{
             Self{
-                stack: std::mem::MaybeUninit::uninit().assume_init(),
+                stack: UncheckMut::new(std::mem::MaybeUninit::uninit().assume_init()),
                 bs: 0
             }
         }
@@ -25,7 +25,6 @@ impl VmStack{
             &mut self.stack.get_mut()[self.bs+reg as usize]
         }
     }
-
 
     #[inline(always)]
     pub fn push_frame(&mut self, frame_size:u8){
@@ -42,7 +41,7 @@ impl Debug for VmStack{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {unsafe{
         writeln!(f,"Stack Dbg:")?;
         for x in 0..(self.bs + 256){
-            writeln!(f,"{:?}",self.stack.get()[x])?
+            writeln!(f,"{:?}",(*self.stack.get())[x])?
         }
         writeln!(f,"----------------------------")
     }}

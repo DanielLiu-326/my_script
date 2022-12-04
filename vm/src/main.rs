@@ -81,29 +81,31 @@ mod vm;
 mod stack;
 mod const_table;
 
+use crate::opcode::OpCode;
 use crate::stack::VmStack;
+use crate::types::Value;
+use crate::vm::VM;
 
 fn main() {unsafe{
     let stack = VmStack::default();
-    println!("{:?}",stack);
 
-    // let mut const_table = Vec::new();
-    // let mut op_codes = Vec::new();
-    //
-    // //opcodes
-    // op_codes.push(OpCode::LoadAsConst(0,0));
-    // op_codes.push(OpCode::LoadAsConst(1,1));
-    //
-    // op_codes.push(OpCode::And(2,0,1));
-    // op_codes.push(OpCode::Or(3,0,1));
-    // op_codes.push(OpCode::BitAnd(4,0,0));
-    //
-    //
-    // //consts
-    // const_table.push(Const::Bool(allocate_value(false).into()));
-    // const_table.push(Const::Bool(allocate_value(true).into()));
-    //
-    // let mut vm = VM::new(op_codes,const_table);
-    // vm.run();
+    let mut const_table = Vec::new();
+    let mut op_codes = Vec::new();
+
+    //opcodes
+    op_codes.push(OpCode::LoadAsConst(0,0));
+    op_codes.push(OpCode::LoadAsConst(1,1));
+
+    op_codes.push(OpCode::And(2,0,1));
+    op_codes.push(OpCode::Or(3,0,1));
+    op_codes.push(OpCode::BitAnd(4,0,0));
+
+
+    //consts
+    const_table.push(Value::Bool(false));
+    const_table.push(Value::Bool(true));
+
+    let mut vm = VM::new(op_codes,const_table);
+    vm.run();
 
 }}

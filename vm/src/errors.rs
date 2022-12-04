@@ -25,6 +25,7 @@ impl Into<Error> for MutabilityError{
     }
 }
 
+
 pub struct UnsupportedOp(&'static str);
 
 impl UnsupportedOp{

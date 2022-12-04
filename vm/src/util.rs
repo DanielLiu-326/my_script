@@ -43,6 +43,12 @@ pub fn deallocate(ptr: NonNull<c_void>) {
 
 pub struct UncheckMut<T>(UnsafeCell<T>);
 
+impl<T:Default> Default for UncheckMut<T>{
+    fn default() -> Self {
+        Self(UnsafeCell::default())
+    }
+}
+
 impl<T> UncheckMut<T>{
     #[inline(always)]
     pub fn new(val:T)->Self{
@@ -259,5 +265,4 @@ pub mod ptr{
             }
         }
     }
-
 }
