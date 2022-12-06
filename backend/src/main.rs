@@ -1,13 +1,42 @@
+extern crate core;
+
+mod errors;
+mod limit;
+
+pub use errors::Result;
+use std::alloc::alloc;
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::iter::Map;
+use std::os::linux::raw::stat;
+use std::process::id;
 use ast::{Expr, Stmt};
+use crate::errors::{DoubleDefine, Error, ScopeOverSize};
 
-static mut ALLOC_REG:u8 = 0;
+static mut IDENT_SCOPE_STACK:Vec<HashSet<String>> = Default::default();
 
-static mut
+/// Scope:
 
-pub fn compile_expr(expr:Expr){
+
+
+
+pub fn compile_(expr:Expr) {
+
+
+}
+pub fn compile_expr(expr:Expr){unsafe{
     match expr{
         Expr::Ident(ident) => {
+            if let Some(reg) = VAR_MAP.get(ident) {
 
+            }else{
+                ALLOC_REG += VAR_MAP.insert(VAR_MAP,ALLOC_REG);
+                ALLOC_REG += 1;
+            }
+            if VAR_MAP.get(ident).unwrap() ==  {
+
+            }else{
+
+            }
         }
         Expr::BinaryOp(_, _, _) => {}
         Expr::UnaryOp(_, _) => {}
@@ -17,7 +46,8 @@ pub fn compile_expr(expr:Expr){
         Expr::Value(_) => {}
         Expr::Brace(_) => {}
     }
-}
+}}
+
 pub fn compile_stmt(stmt:Stmt){
     match stmt{
         Stmt::IfStmt(condition, success,failure) => {
@@ -36,6 +66,7 @@ pub fn compile_stmt(stmt:Stmt){
         Stmt::ReturnStmt(_) => {}
     }
 }
+
 pub fn compile(ast:ast::Stmts){
     for x in ast.stmts{
 

@@ -3,6 +3,5 @@
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/util/linked_list" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/util/trait-linked-list" vcs="Git" />
   </component>
 </project>

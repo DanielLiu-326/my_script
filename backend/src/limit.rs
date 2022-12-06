@@ -1,0 +1,1 @@
+pub(crate) const MAX_VARIABLE_REG:u8 = 255;

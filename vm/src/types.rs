@@ -16,6 +16,7 @@ pub type Float      = f64;
 
 pub type Bool       = bool;
 
+
 #[derive(Debug,Clone,Copy)]
 pub struct Nil();
 
