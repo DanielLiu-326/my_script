@@ -2,7 +2,7 @@ extern crate core;
 
 use proc_macro::{ TokenStream};
 use convert_case::{Case, Casing};
-use syn::token::{Comma, FatArrow};
+use syn::token::{Colon, Comma, FatArrow};
 use syn::{Block, braced, Token, ItemEnum, Expr, Ident, PatTuple, Pat, PatType};
 use syn::__private::ToTokens;
 use syn::parse::{Parse, ParseStream};
@@ -407,3 +407,51 @@ pub fn call_binary_op(input:TokenStream) -> TokenStream{
 //     }
 //
 // }
+
+struct MatchValueArgument{
+    expr:Expr,
+    fat_arrow:FatArrow,
+    ident:Ident,
+    block:Block,
+}
+impl Parse for MatchValueArgument{
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let expr = input.parse()?;
+        let fat_arrow = input.parse()?;
+        let ident= input.parse()?;
+        let block= input.parse()?;
+
+        Ok(Self{
+            expr,
+            fat_arrow,
+            ident,
+            block,
+        })
+    }
+}
+
+/// ```rust
+/// match_value!(expr => left{
+///
+/// })
+/// ```
+#[proc_macro]
+pub fn match_value(input:TokenStream)->TokenStream{unsafe{
+    let mut code = String::new();
+
+    let MatchValueArgument {
+        expr,
+        ident,
+        block,
+        ..
+    } = syn::parse(input);
+
+    let arg_input = expr.to_token_stream().to_string();
+    let arg_var = ident.to_token_stream().to_string();
+    let arg_body = block.to_token_stream().to_string();
+
+
+    format!("match {}",).parse().unwrap()
+
+
+}}
