@@ -126,7 +126,7 @@ impl VM{
             // OpCode::MemberGet(_, _, _) => {unimplemented!()}
             // OpCode::MemberSet(_, _, _) => {unimplemented!()}
             OpCode::RefAssign(a, b) => {
-                self(a)
+                unimplemented!()
             }
             OpCode::ValAssign(_, _) => {
                 unimplemented!()

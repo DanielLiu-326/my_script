@@ -30,7 +30,9 @@ pub fn val_enum_def(_attr:TokenStream,input:TokenStream) -> TokenStream{unsafe{
     VAL_ENUM_TYPE = enum_item.ident.to_string();
 
     for x in enum_item.variants{
-        if let (1,Some(field)) = (x.fields.iter().count(),x.fields.iter().last()){
+        let count = x.fields.iter().count();
+        let field = x.fields.iter().last();
+        if let (1,Some(field)) = (count,field){
             VAL_ENUMS.push((x.ident.to_string(),field.ty.to_token_stream().to_string()))
         }else{
             Err(syn::Error::new(x.fields.span(),"Value enum must have one field")).unwrap()
@@ -78,7 +80,6 @@ pub fn val_enum_def(_attr:TokenStream,input:TokenStream) -> TokenStream{unsafe{
 
     println!("{}",ret_code);
     ret_code.parse().unwrap()
-
 }}
 
 
@@ -139,55 +140,55 @@ pub fn reg_enum_def(_attr:TokenStream,input:TokenStream) -> TokenStream{unsafe{
     impl_code.parse().unwrap()
 }}
 
-/// ```rust
-/// use macros::match_1_reg;
-/// match_1_reg!(a => b,{b.unbox_const()})
-/// ```
-struct Match1Reg{
+
+struct MatchReg {
     expr:Expr,
     fat_arrow:FatArrow,
     var_name:Ident,
-    comma:Comma,
     block:Block,
 }
-impl Parse for Match1Reg{
+impl Parse for MatchReg {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let expr = input.parse()?;
         let fat_arrow = input.parse()?;
         let var_name = input.parse()?;
-        let comma = input.parse()?;
         let block = input.parse()?;
 
         Ok(Self{
             expr,
             fat_arrow,
             var_name,
-            comma,
             block,
         })
     }
 }
+/// ```rust
+/// use macros::match_reg;
+/// match_reg!(a => b{b.unbox_const()})
+/// ```
 #[proc_macro]
-pub fn match_1_reg(input:TokenStream)->TokenStream{unsafe{
-    let input:Match1Reg = syn::parse(input).unwrap();
+pub fn match_reg(input:TokenStream) ->TokenStream{unsafe{
+    let input: MatchReg = syn::parse(input).unwrap();
+    let match_input = input.expr.to_token_stream().to_string();
+    let var_name = input.var_name.to_string();
+    let body = input.block.to_token_stream().to_string();
 
-    let code = format!(r#"match {}{{
-        {}
-    }}"#,input.expr.to_token_stream().to_string(),
-        REG_ENUMS.iter().map(|(enum_variant,_)|{
+    let match_body = REG_ENUMS
+        .iter().map(|(enum_variant,_)|{
             format!("{}::{}({}) => {{ let __variant__ = \"{}\";{} }},",
-                    REG_ENUM_TYPE,
-                    enum_variant,
-                    input.var_name.to_string(),
-                    enum_variant,
-                    input.block.to_token_stream().to_string()
+                REG_ENUM_TYPE,
+                enum_variant,
+                var_name,
+                enum_variant,
+                body
             )
-        }).reduce(|res,now|{res + &now}).unwrap().as_str()
-    );
+        }).reduce(|res,now| {
+            res + &now
+        }).unwrap();
 
+    let code = format!("match {} {{ {} }}",match_input,match_body);
 
     code .parse().unwrap()
-
 }}
 
 struct OpBody {
@@ -195,6 +196,50 @@ struct OpBody {
     fat_arrow:FatArrow,
     expr:Expr,
 }
+impl OpBody{
+    pub fn to_match_branch(&self,op_name:String,mutibility:bool)->String{unsafe{
+        let calc_expr = self.expr.to_token_stream().to_string();
+        let elems = &self.pat.elems;
+        let first = elems.first().unwrap().to_token_stream().to_string();
+        let second = elems.last().unwrap().to_token_stream().to_string();
+
+        let left_type = if mutibility {
+            REF_MUT_VAL_TYPE.as_str()
+        } else {
+            REF_VAL_TYPE.as_str()
+        };
+
+        let mut left_pat = String::from("left");
+        let mut right_pat = String::from("right");
+
+        if first != "_" {
+            let variant = &(*VAL_ENUMS
+                .iter()
+                .find(|(_,type_name)|{
+                    type_name == &first
+                })
+                .expect(format!("Type {} is not a Value",first).as_str())
+            ).0;
+
+            left_pat = format!("{}::{}(left)", left_type, variant);
+        }
+
+        if second != "_" {
+            let variant = &(*VAL_ENUMS
+                .iter()
+                .find(|(_,type_name)|{
+                    type_name == &second
+                })
+                .expect(format!("Type {} is not a Value",second).as_str())
+            ).0;
+
+            right_pat = format!("{}::{}(right)", left_type, variant);
+        }
+
+        format!("({},{}) => {},", left_pat, right_pat, calc_expr)
+    }}
+}
+
 fn parse_pat_tuple(input:&ParseStream) ->syn::Result<PatTuple>{
     match input.parse::<Pat>()?{
         Pat::Tuple(tup) => {
@@ -214,9 +259,11 @@ impl Parse for OpBody {
         let pat = parse_pat_tuple(&input)?;
         let fat_arrow = input.parse()?;
         let block = input.parse()?;
+
         if pat.elems.iter().count()!=2{
             Err(syn::Error::new(pat.span(),"Two Value types expected"))?;
         }
+
         Ok(Self{
             pat,
             fat_arrow,
@@ -263,7 +310,6 @@ impl Parse for ImplOps {
     }
 }
 
-
 /// ```rust
 /// impl_binary_op!{
 ///     OpAdd => {
@@ -280,65 +326,45 @@ impl Parse for ImplOps {
 pub fn impl_binary_ops(input:TokenStream) -> TokenStream{unsafe{
     let input: ImplOps = syn::parse(input).unwrap();
     let mut code = String::new();
-    let mut mutibility = false;
+
     for y in input.ops {
-        mutibility = y.mutbility.is_some();
-        let (ref_val_type,unbox_fn_name) = if mutibility {
-            (REF_MUT_VAL_TYPE.as_str(),"unbox_mut")
-        }else{
-            (REF_VAL_TYPE.as_str(),"unbox_const")
+        let op_name = y.ident.to_string();
+        let mutibility = y.mutbility.is_some();
+
+        let left_unbox_fn = match mutibility{
+            true =>"unbox_mut",
+            false=>"unbox_const"
         };
+        let right_unbox_fn = "unbox_const";
 
-        code += "#[inline(always)]";
-        code += format!("pub fn {}_impl(left:&{},right:&{}) -> Result<{}> {{",
-                        y.ident.to_string().to_case(Case::Snake),
-                        REG_ENUM_TYPE,
-                        REG_ENUM_TYPE,
-                        VAL_ENUM_TYPE
-        ).as_str();
+        let match_branchs = y.bodies.iter().map(|body|{
+            body.to_match_branch(op_name.clone(),mutibility)
+        }).reduce(|accu,now|{accu+&now}).unwrap();
 
-        code += format!("match (left.{}().unwrap() , right.unbox_const().unwrap()){{",
-                        unbox_fn_name
-        ).as_str();
+        let match_expr = format!("match (left.{}().unwrap() , right.{}().unwrap()){{
+            {}
+         }}", left_unbox_fn, right_unbox_fn, match_branchs);
 
-        for x in y.bodies{
-            let elems = &x.pat.elems;
-            let first = elems.first().unwrap().to_token_stream().to_string();
-            let second = elems.last().unwrap().to_token_stream().to_string();
+        let op_impl_fn = format!("
+            #[inline(always)]
+            pub fn {}_impl(left:&{},right:&{})->Result<{}> {{
+                const __op_name__:&'static str = \"{}\";
+                {}
+            }}",
+            op_name.to_string().to_case(Case::Snake),
+            REG_ENUM_TYPE,
+            REG_ENUM_TYPE,
+            VAL_ENUM_TYPE,
+            op_name,
+            match_expr
+        );
 
-            // find enum variant by variable first
-            let left_pat = if first!= "_" {
-                format!("{}::{}(left)",ref_val_type, (
-                        *VAL_ENUMS.iter().find(|(_,type_name)|{
-                            type_name == &first
-                        }).expect(format!("Type {} is not a Value",first).as_str())
-                ).0)
-            }else{
-                "left".to_string()
-            };
-
-            // find enum variant by variable second
-            let right_pat = if first!= "_" {
-                format!("{}::{}(right)",REF_VAL_TYPE,(
-                    *VAL_ENUMS.iter().find(|(_,type_name)|{
-                        type_name == &second
-                    }).expect(format!("Type {} is not a Value",second).as_str())
-                ).0)
-            }else{
-                "right".to_string()
-            };
-
-            code += format!("({},{}) => {{ const __op_name__:&'static str = \"{}\"; {} }},",
-                            left_pat, right_pat, y.ident.to_string(),
-                            x.expr.to_token_stream().to_string()).as_str();
-        }
-        code += "}";
-        code += "}";
+        code += &op_impl_fn;
     }
 
     println!("{}",code.to_string());
 
-    return code.parse().unwrap();
+    code.parse().unwrap()
 }}
 
 
@@ -375,10 +401,10 @@ impl Parse for CallOpArg{
 pub fn call_binary_op(input:TokenStream) -> TokenStream{
     let args:CallOpArg = syn::parse(input).unwrap();
     let fn_name = args.op.to_string().to_case(Case::Snake)+"_impl";
-    let code = format!("{}({},{})",
-                       fn_name,args.left.to_token_stream().to_string(),
-                       args.right.to_token_stream().to_string()
-    );
+    let args_left = args.left.to_token_stream().to_string();
+    let args_right = args.right.to_token_stream().to_string();
+
+    let code = format!("{}({},{})", fn_name,args_left,args_right);
 
     code.parse().unwrap()
 }
@@ -444,14 +470,20 @@ pub fn match_value(input:TokenStream)->TokenStream{unsafe{
         ident,
         block,
         ..
-    } = syn::parse(input);
+    } = syn::parse(input).unwrap();
 
-    let arg_input = expr.to_token_stream().to_string();
+    let arg_value = expr.to_token_stream().to_string();
     let arg_var = ident.to_token_stream().to_string();
     let arg_body = block.to_token_stream().to_string();
 
+    let match_body = VAL_ENUMS
+        .iter()
+        .map(|(now,_)|{
+            format!("{}::{}({}) => {},",VAL_ENUM_TYPE,now,arg_var,arg_body)
+        }).reduce(|accu,now|{
+            accu + &now
+        }).unwrap();
 
-    format!("match {}",).parse().unwrap()
-
+    format!("match {} {{ {} }}", arg_value,match_body).parse().unwrap()
 
 }}

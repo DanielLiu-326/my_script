@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
-use macros::{val_enum_def, reg_enum_def, match_1_reg, impl_binary_ops, call_binary_op};
+use macros::{val_enum_def, reg_enum_def, match_reg, impl_binary_ops, call_binary_op, match_value};
 use crate::errors;
 use crate::mem_collection::RefCount;
 use crate::util::UncheckMut;
@@ -10,6 +10,12 @@ use crate::errors::*;
 /// Value Types
 ///
 
+pub trait Val{
+    fn load_variable(&self,mutable:bool) -> RegType{
+
+    }
+    fn load_mutable(&self)
+}
 pub type Integer    = i64;
 
 pub type Float      = f64;
@@ -145,7 +151,7 @@ pub enum RegType{
 
 impl Debug for RegType{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match_1_reg!(self => a,{
+        match_reg!(self => a{
             write!(f,"RegType::{}({:?})",__variant__,a.unbox_const().unwrap())?;
         });
 
@@ -448,6 +454,14 @@ impl RegTy for ConstRefNil{
     }
 }
 
+pub fn op_OR(a:RegType,b:RegType)->Result<RegType>{
+    use Value::*;
+    match(a.unbox_const()?,b.unbox_const()?){
+        (Integer(left),Integer(right)) => Ok(Value::Bool(*left != 0 || *right != 0)),
+
+
+    }
+}
 impl_binary_ops!{
     OpOr => {
         //
