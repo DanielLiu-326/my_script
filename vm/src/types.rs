@@ -53,7 +53,9 @@ bin_op_def!{
         // Bool
         (left:Bool   ,right:Integer) -> Result<Bool> => Ok(left || right!=0),
         (left:Bool   ,right:Bool   ) -> Result<Bool> => Ok(left || right),
+        (_,_) -> Result<Bool> => Err(Error::),
     }
+
     op_and => {
         // Integer
         (left:Integer,right:Integer) -> Bool => (left != 0 && right!=0),
@@ -63,6 +65,7 @@ bin_op_def!{
         (left:Bool   ,right:Integer) -> Bool => (left && right!=0),
         (left:Bool   ,right:Bool   ) -> Bool => (left && right),
     }
+
     op_bit_or => {
         // Integer
         (left:Integer,right:Integer) -> Integer => (left | right),
@@ -70,6 +73,7 @@ bin_op_def!{
         // Bool
         (left:Bool   ,right:Bool   ) -> Bool    => (left | right),
     }
+
     op_bit_xor => {
         // Integer
         (left:Integer,right:Integer) -> Integer => (left ^ right),
@@ -78,6 +82,7 @@ bin_op_def!{
         (left:Bool   ,right:Bool   ) -> Bool    => (left ^ right),
 
     }
+
     op_bit_and => {
         // Integer
         (left:Integer,right:Integer) -> Integer => (left & right),
@@ -85,6 +90,7 @@ bin_op_def!{
         // Bool
         (left:Bool   ,right:Bool   ) -> Bool    => (left & right),
     }
+
     op_ne => {
         // Integer
         (left:Integer ,right:Integer) -> Bool => (left != right),
@@ -100,6 +106,7 @@ bin_op_def!{
         // default
         (_,_) -> Bool  => (true),
     }
+
     op_eq => {
         // Integer
         (left:Integer ,right:Integer) -> Bool => (left == right),
@@ -115,6 +122,7 @@ bin_op_def!{
         // default
         (_,_) -> Bool  => (false),
     }
+
     op_lt => {
         // Integer
         (left:Integer ,right:Integer) -> Bool => (left < right),
@@ -124,6 +132,7 @@ bin_op_def!{
         (left:Float   ,right:Float  ) -> Bool => (left < right),
         (left:Float   ,right:Integer) -> Bool => (left < right as Float),
     }
+
     op_gt => {
         // Integer
         (left:Integer ,right:Integer) -> Bool => (left > right),
@@ -143,6 +152,7 @@ bin_op_def!{
         (left:Float   ,right:Float  ) -> Bool => (left <= right),
         (left:Float   ,right:Integer) -> Bool => (left <= right as Float),
     }
+
     op_ge => {
         // Integer
         (left:Integer ,right:Integer) -> Bool => (left >= right),
@@ -152,14 +162,17 @@ bin_op_def!{
         (left:Float   ,right:Float  ) -> Bool => (left >= right),
         (left:Float   ,right:Integer) -> Bool => (left >= right as Float),
     }
+
     op_l_mov => {
         // Integer
         (left:Integer ,right:Integer) -> Integer => (left << right),
     }
+
     op_r_mov => {
         // Integer
         (left:Integer ,right:Integer) -> Integer => (left >> right),
     }
+
     op_add => {
         // Integer
         (left:Integer ,right:Integer) -> Integer => (left + right),
@@ -169,17 +182,54 @@ bin_op_def!{
         (left:Float   ,right:Integer) -> Float   => (left + right as Float),
         (left:Float   ,right:Float  ) -> Float   => (left + right),
     }
+
     op_sub => {
         // Integer
-        (left:Integer ,right:Integer) -> Integer => (left + right),
-        (left:Integer ,right:Float  ) -> Float   => ((left as Float) + right),
+        (left:Integer ,right:Integer) -> Integer => (left - right),
+        (left:Integer ,right:Float  ) -> Float   => ((left as Float) - right),
 
         // Float
-        (left:Float   ,right:Integer) -> Float   => (left + right as Float),
-        (left:Float   ,right:Float  ) -> Float   => (left + right),
+        (left:Float   ,right:Integer) -> Float   => (left - right as Float),
+        (left:Float   ,right:Float  ) -> Float   => (left - right),
     }
 
+    op_mul => {
+        // Integer
+        (left:Integer,right:Integer) -> Integer => (left * right),
+        (left:Integer,right:Float  ) -> Float   => ((left as Float) * right),
+        // Float
+        (left:Float,right:Integer  ) -> Float   => (left * right as Float),
+        (left:Float,right:Float    ) -> Float   => (left * right),
+    }
 
+    op_div => {
+        // Integer
+        (left:Integer,right:Integer) -> Integer => (left / right),
+        (left:Integer,right:Float  ) -> Float   => ((left as Float) / right),
+        // Float
+        (left:Float,right:Integer  ) -> Float   => (left / right as Float),
+        (left:Float,right:Float    ) -> Float   => (left / right),
+    }
+
+    op_mod => {
+        // Integer
+        (left:Integer,right:Integer) -> Integer => (left % right),
+    }
+
+    op_fact => {
+        // Integer
+        (left:Integer,right:Integer) -> Integer => (left % right),
+    }
+
+    op_assign => {
+        // todo:
+        // 1.mut keyword support for macro
+        // 2.implements op_assign
+    }
+}
+#[test]
+fn test(){
+    println!("1+1={:?}",op_or(0.0,0.0));
 }
 
 // impl_default!(
