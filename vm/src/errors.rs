@@ -1,4 +1,5 @@
 use std::fmt::{Debug, Formatter};
+use macros::mux;
 
 pub struct MutabilityError(bool);
 
@@ -18,12 +19,6 @@ impl Debug for MutabilityError{
         }
     }
 }
-impl Into<Error> for MutabilityError{
-    #[inline(always)]
-    fn into(self) -> Error {
-        Error::MutabilityError(self)
-    }
-}
 
 
 pub struct UnsupportedOp(&'static str);
@@ -41,13 +36,7 @@ impl Debug for UnsupportedOp {
     }
 }
 
-impl Into<Error> for UnsupportedOp{
-    #[inline(always)]
-    fn into(self) -> Error {
-        Error::UnsupportedOp(self)
-    }
-}
-
+#[mux]
 #[derive(Debug)]
 pub enum Error{
     MutabilityError(MutabilityError),

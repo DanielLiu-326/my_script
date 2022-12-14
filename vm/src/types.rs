@@ -12,6 +12,7 @@ macro_rules! bin_op_impl {
             $expr
         }
     }};
+
     ($op_name:ident,($left_var:ident:$left_ty:ty,$right_var:ident:$right_ty:ty) -> $ret_ty:ty => $expr:expr) => {paste!{
         impl ![<__ $op_name:camel:upper>] for ($left_ty,$right_ty){}
 
@@ -31,7 +32,6 @@ macro_rules! bin_op_def {
                 bin_op_impl!{$op_name,$args -> $ret_ty => $body}
             )*
         )*
-
     }}
 }
 
@@ -43,6 +43,7 @@ type Integer = i64;
 type Float   = f64;
 type Bool    = bool;
 
+/* operations */
 
 bin_op_def!{
     op_or  => {
@@ -53,172 +54,221 @@ bin_op_def!{
         // Bool
         (left:Bool   ,right:Integer) -> Result<Bool> => Ok(left || right!=0),
         (left:Bool   ,right:Bool   ) -> Result<Bool> => Ok(left || right),
-        (_,_) -> Result<Bool> => Err(Error::),
+
+        //default
+        (_,_) -> Result<()> => Err(UnsupportedOp::new("op_or").into()),
     }
 
     op_and => {
         // Integer
-        (left:Integer,right:Integer) -> Bool => (left != 0 && right!=0),
-        (left:Integer,right:Bool   ) -> Bool => (left != 0 && right),
+        (left:Integer,right:Integer) -> Result<Bool> => Ok(left != 0 && right!=0),
+        (left:Integer,right:Bool   ) -> Result<Bool> => Ok(left != 0 && right),
 
         // Bool
-        (left:Bool   ,right:Integer) -> Bool => (left && right!=0),
-        (left:Bool   ,right:Bool   ) -> Bool => (left && right),
+        (left:Bool   ,right:Integer) -> Result<Bool> => Ok(left && right!=0),
+        (left:Bool   ,right:Bool   ) -> Result<Bool> => Ok(left && right),
+
+        //default
+        (_,_) -> Result<()> => Err(UnsupportedOp::new("op_and").into()),
     }
 
     op_bit_or => {
         // Integer
-        (left:Integer,right:Integer) -> Integer => (left | right),
+        (left:Integer,right:Integer) -> Result<Integer> => Ok(left | right),
 
         // Bool
-        (left:Bool   ,right:Bool   ) -> Bool    => (left | right),
+        (left:Bool   ,right:Bool   ) -> Result<Bool>    => Ok(left | right),
+
+        //default
+        (_,_) -> Result<()> => Err(UnsupportedOp::new("op_bit_or").into()),
     }
 
     op_bit_xor => {
         // Integer
-        (left:Integer,right:Integer) -> Integer => (left ^ right),
+        (left:Integer,right:Integer) -> Result<Integer> => Ok(left ^ right),
 
         // Bool
-        (left:Bool   ,right:Bool   ) -> Bool    => (left ^ right),
+        (left:Bool   ,right:Bool   ) -> Result<Bool>    => Ok(left ^ right),
 
+        //default
+        (_,_) -> Result<()> => Err(UnsupportedOp::new("op_bit_xor").into()),
     }
 
     op_bit_and => {
         // Integer
-        (left:Integer,right:Integer) -> Integer => (left & right),
+        (left:Integer,right:Integer) -> Result<Integer> => Ok(left & right),
 
         // Bool
-        (left:Bool   ,right:Bool   ) -> Bool    => (left & right),
+        (left:Bool   ,right:Bool   ) -> Result<Bool>    => Ok(left & right),
+
+        //default
+        (_,_) -> Result<()> => Err(UnsupportedOp::new("op_bit_and").into()),
     }
 
     op_ne => {
         // Integer
-        (left:Integer ,right:Integer) -> Bool => (left != right),
-        (left:Integer ,right:Float  ) -> Bool => (left as f64 != right),
+        (left:Integer ,right:Integer) -> Result<Bool> => Ok(left != right),
+        (left:Integer ,right:Float  ) -> Result<Bool> => Ok(left as f64 != right),
 
         // Float
-        (left:Float   ,right:Float  ) -> Bool => (left != right),
-        (left:Float   ,right:Integer) -> Bool => (left != right as Float),
+        (left:Float   ,right:Float  ) -> Result<Bool> => Ok(left != right),
+        (left:Float   ,right:Integer) -> Result<Bool> => Ok(left != right as Float),
 
         // Bool
-        (left:Bool    ,right:Bool   ) -> Bool => (left != right),
+        (left:Bool    ,right:Bool   ) -> Result<Bool> => Ok(left != right),
 
         // default
-        (_,_) -> Bool  => (true),
+        (_,_) -> Result<Bool>  => Ok(true),
     }
 
     op_eq => {
         // Integer
-        (left:Integer ,right:Integer) -> Bool => (left == right),
-        (left:Integer ,right:Float  ) -> Bool => (left as f64 == right),
+        (left:Integer ,right:Integer) -> Result<Bool> => Ok(left == right),
+        (left:Integer ,right:Float  ) -> Result<Bool> => Ok(left as f64 == right),
 
         // Float
-        (left:Float   ,right:Float  ) -> Bool => (left == right),
-        (left:Float   ,right:Integer) -> Bool => (left == right as Float),
+        (left:Float   ,right:Float  ) -> Result<Bool> => Ok(left == right),
+        (left:Float   ,right:Integer) -> Result<Bool> => Ok(left == right as Float),
 
         // Bool
-        (left:Bool    ,right:Bool   ) -> Bool => (left == right),
+        (left:Bool    ,right:Bool   ) -> Result<Bool> => Ok(left == right),
 
         // default
-        (_,_) -> Bool  => (false),
+        (_,_) -> Result<Bool>  => Ok(false),
     }
 
     op_lt => {
         // Integer
-        (left:Integer ,right:Integer) -> Bool => (left < right),
-        (left:Integer ,right:Float  ) -> Bool => ((left as Float) < right),
+        (left:Integer ,right:Integer) -> Result<Bool> => Ok(left < right),
+        (left:Integer ,right:Float  ) -> Result<Bool> => Ok((left as Float) < right),
 
         // Float
-        (left:Float   ,right:Float  ) -> Bool => (left < right),
-        (left:Float   ,right:Integer) -> Bool => (left < right as Float),
+        (left:Float   ,right:Float  ) -> Result<Bool> => Ok(left < right),
+        (left:Float   ,right:Integer) -> Result<Bool> => Ok(left < right as Float),
+
+        //default
+        (_,_) -> Result<()> => Err(UnsupportedOp::new("op_lt").into()),
     }
 
     op_gt => {
         // Integer
-        (left:Integer ,right:Integer) -> Bool => (left > right),
-        (left:Integer ,right:Float  ) -> Bool => (left as f64 > right),
+        (left:Integer ,right:Integer) -> Result<Bool> => Ok(left > right),
+        (left:Integer ,right:Float  ) -> Result<Bool> => Ok(left as f64 > right),
 
         // Float
-        (left:Float   ,right:Float  ) -> Bool => (left > right),
-        (left:Float   ,right:Integer) -> Bool => (left > right as Float),
+        (left:Float   ,right:Float  ) -> Result<Bool> => Ok(left > right),
+        (left:Float   ,right:Integer) -> Result<Bool> => Ok(left > right as Float),
+
+        //default
+        (_,_) -> Result<()> => Err(UnsupportedOp::new("op_gt").into()),
     }
 
     op_le => {
         // Integer
-        (left:Integer ,right:Integer) -> Bool => (left <= right),
-        (left:Integer ,right:Float  ) -> Bool => (left as f64 <= right),
+        (left:Integer ,right:Integer) -> Result<Bool> => Ok(left <= right),
+        (left:Integer ,right:Float  ) -> Result<Bool> => Ok(left as f64 <= right),
 
         // Float
-        (left:Float   ,right:Float  ) -> Bool => (left <= right),
-        (left:Float   ,right:Integer) -> Bool => (left <= right as Float),
+        (left:Float   ,right:Float  ) -> Result<Bool> => Ok(left <= right),
+        (left:Float   ,right:Integer) -> Result<Bool> => Ok(left <= right as Float),
+
+        //default
+        (_,_) -> Result<()> => Err(UnsupportedOp::new("op_le").into()),
     }
 
     op_ge => {
         // Integer
-        (left:Integer ,right:Integer) -> Bool => (left >= right),
-        (left:Integer ,right:Float  ) -> Bool => (left as f64 >= right),
+        (left:Integer ,right:Integer) -> Result<Bool> => Ok(left >= right),
+        (left:Integer ,right:Float  ) -> Result<Bool> => Ok(left as f64 >= right),
 
         // Float
-        (left:Float   ,right:Float  ) -> Bool => (left >= right),
-        (left:Float   ,right:Integer) -> Bool => (left >= right as Float),
+        (left:Float   ,right:Float  ) -> Result<Bool> => Ok(left >= right),
+        (left:Float   ,right:Integer) -> Result<Bool> => Ok(left >= right as Float),
+
+        //default
+        (_,_) -> Result<()> => Err(UnsupportedOp::new("op_ge").into()),
     }
 
     op_l_mov => {
         // Integer
-        (left:Integer ,right:Integer) -> Integer => (left << right),
+        (left:Integer ,right:Integer) -> Result<Integer> => Ok(left << right),
+
+        //default
+        (_,_) -> Result<()> => Err(UnsupportedOp::new("op_l_mov").into()),
     }
 
     op_r_mov => {
         // Integer
-        (left:Integer ,right:Integer) -> Integer => (left >> right),
+        (left:Integer ,right:Integer) -> Result<Integer> => Ok(left >> right),
+
+        //default
+        (_,_) -> Result<()> => Err(UnsupportedOp::new("op_r_mov").into()),
     }
 
     op_add => {
         // Integer
-        (left:Integer ,right:Integer) -> Integer => (left + right),
-        (left:Integer ,right:Float  ) -> Float   => ((left as Float) + right),
+        (left:Integer ,right:Integer) -> Result<Integer> => Ok(left + right),
+        (left:Integer ,right:Float  ) -> Result<Float>   => Ok((left as Float) + right),
 
         // Float
-        (left:Float   ,right:Integer) -> Float   => (left + right as Float),
-        (left:Float   ,right:Float  ) -> Float   => (left + right),
+        (left:Float   ,right:Integer) -> Result<Float>   => Ok(left + right as Float),
+        (left:Float   ,right:Float  ) -> Result<Float>   => Ok(left + right),
+
+        //default
+        (_,_) -> Result<()> => Err(UnsupportedOp::new("op_add").into()),
     }
 
     op_sub => {
         // Integer
-        (left:Integer ,right:Integer) -> Integer => (left - right),
-        (left:Integer ,right:Float  ) -> Float   => ((left as Float) - right),
+        (left:Integer ,right:Integer) -> Result<Integer> => Ok(left - right),
+        (left:Integer ,right:Float  ) -> Result<Float>   => Ok((left as Float) - right),
 
         // Float
-        (left:Float   ,right:Integer) -> Float   => (left - right as Float),
-        (left:Float   ,right:Float  ) -> Float   => (left - right),
+        (left:Float   ,right:Integer) -> Result<Float>   => Ok(left - right as Float),
+        (left:Float   ,right:Float  ) -> Result<Float>   => Ok(left - right),
+
+        //default
+        (_,_) -> Result<()> => Err(UnsupportedOp::new("op_sub").into()),
     }
 
     op_mul => {
         // Integer
-        (left:Integer,right:Integer) -> Integer => (left * right),
-        (left:Integer,right:Float  ) -> Float   => ((left as Float) * right),
+        (left:Integer,right:Integer) -> Result<Integer> => Ok(left * right),
+        (left:Integer,right:Float  ) -> Result<Float>   => Ok((left as Float) * right),
         // Float
-        (left:Float,right:Integer  ) -> Float   => (left * right as Float),
-        (left:Float,right:Float    ) -> Float   => (left * right),
+        (left:Float,right:Integer  ) -> Result<Float>   => Ok(left * right as Float),
+        (left:Float,right:Float    ) -> Result<Float>   => Ok(left * right),
+
+        //default
+        (_,_) -> Result<()> => Err(UnsupportedOp::new("op_mul").into()),
     }
 
     op_div => {
         // Integer
-        (left:Integer,right:Integer) -> Integer => (left / right),
-        (left:Integer,right:Float  ) -> Float   => ((left as Float) / right),
+        (left:Integer,right:Integer) -> Result<Integer> => Ok(left / right),
+        (left:Integer,right:Float  ) -> Result<Float>   => Ok((left as Float) / right),
         // Float
-        (left:Float,right:Integer  ) -> Float   => (left / right as Float),
-        (left:Float,right:Float    ) -> Float   => (left / right),
+        (left:Float,right:Integer  ) -> Result<Float>   => Ok(left / right as Float),
+        (left:Float,right:Float    ) -> Result<Float>   => Ok(left / right),
+
+        //default
+        (_,_) -> Result<()> => Err(UnsupportedOp::new("op_div").into()),
     }
 
     op_mod => {
         // Integer
-        (left:Integer,right:Integer) -> Integer => (left % right),
+        (left:Integer,right:Integer) -> Result<Integer> => Ok(left % right),
+
+        //default
+        (_,_) -> Result<()> => Err(UnsupportedOp::new("op_mod").into()),
     }
 
     op_fact => {
         // Integer
-        (left:Integer,right:Integer) -> Integer => (left % right),
+        (left:Integer,right:Integer) -> Result<Integer> => Ok(left % right),
+
+        //default
+        (_,_) -> Result<()> => Err(UnsupportedOp::new("op_fact").into()),
     }
 
     op_assign => {
@@ -227,9 +277,25 @@ bin_op_def!{
         // 2.implements op_assign
     }
 }
+
+#[mux]
+pub enum RegType{
+
+}
+
+pub struct InlineInteger<const mutable:Bool>(Integer);
+
+pub struct InlineFloat<const mutable:Bool>(Float);
+
+pub struct InlineBool<const mutable:Bool>(Bool);
+
+pub struct RefInteger<const mutable:Bool>()
+
+
 #[test]
 fn test(){
     println!("1+1={:?}",op_or(0.0,0.0));
+    println!("1+1={:?}",op_or(0,0));
 }
 
 // impl_default!(
