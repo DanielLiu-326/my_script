@@ -12,11 +12,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "lazy_static"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
+
+[[package]]
 name = "macros"
 version = "0.1.0"
 dependencies = [
  "convert_case",
  "proc-macro2",
+ "syn",
+]
+
+[[package]]
+name = "overloadf"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da4a33906f7b69e3121590fbe284dd889849f21bbb98a263ec04a52d318d096d"
+dependencies = [
+ "overloadf_derive",
+]
+
+[[package]]
+name = "overloadf_derive"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ebed944fda17775c57cf3b66b55ae90346de2cf72f3f6f95d24e6bbe955f619b"
+dependencies = [
+ "lazy_static",
+ "proc-macro2",
+ "quote",
  "syn",
 ]
 
@@ -72,5 +99,6 @@ name = "vm"
 version = "0.1.0"
 dependencies = [
  "macros",
+ "overloadf",
  "paste",
 ]

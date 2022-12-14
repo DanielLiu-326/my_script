@@ -61,9 +61,9 @@ impl<T> UncheckMut<T>{
     }}
 
     #[inline(always)]
-    pub fn get(& self) -> & T{unsafe{
+    pub fn get(&self) -> & T{
         &*self.get_mut()
-    }}
+    }
 }
 
 pub mod ptr{
