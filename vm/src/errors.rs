@@ -1,22 +1,18 @@
-use std::fmt::{Debug, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use macros::mux;
 
-pub struct MutabilityError(bool);
+pub struct MutabilityError;
 
 impl MutabilityError{
     #[inline(always)]
-    pub fn new(mutable:bool)->Self{
-        Self(mutable)
+    pub fn new()->Self{
+        Self
     }
 }
 
 impl Debug for MutabilityError{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if self.0{
-            write!(f,"Can't access object mutably with the reference")
-        }else{
-            write!(f,"Can't access object constant with the reference")
-        }
+        write!(f,"Can't access object mutably with the reference")
     }
 }
 
@@ -36,11 +32,27 @@ impl Debug for UnsupportedOp {
     }
 }
 
+pub struct DerefNull;
+
+impl DerefNull{
+    pub fn new()->Self{
+        Self
+    }
+}
+
+impl Debug for DerefNull {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f,"attempt deref on a null reference")
+    }
+}
+
+
 #[mux]
 #[derive(Debug)]
 pub enum Error{
     MutabilityError(MutabilityError),
     UnsupportedOp(UnsupportedOp),
+    DerefNull(DerefNull)
 }
 
 pub(crate) type Result<T> = std::result::Result<T,Error>;
