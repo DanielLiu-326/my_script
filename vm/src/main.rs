@@ -1,5 +1,5 @@
 #![feature(unboxed_closures,fn_traits,ptr_metadata,auto_traits,negative_impls)]
-
+#![feature(specialization)]
 
 
 ///
