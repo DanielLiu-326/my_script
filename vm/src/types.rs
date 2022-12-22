@@ -1,13 +1,20 @@
+use std::any::type_name;
+use std::fmt::{Debug, Formatter, write};
 use paste::paste;
 use overloadf::overload;
 use crate::errors::*;
 use crate::mem_collection::RefCount;
 use macros::mux;
 
+pub trait Op {
+    fn calculate(self) -> Result<Value>;
+}
+
 /// Implements the function for ops
 macro_rules! bin_op_impl {
     ($op_name:ident,(_,_) => $expr:expr) => {paste!{
         impl<Left,Right> Op for [<$op_name:camel:upper>] <Left,Right>{
+            #[inline(always)]
             default fn calculate(self) -> Result<Value>{
                 $expr
             }
@@ -26,23 +33,25 @@ macro_rules! bin_op_impl {
             }
         }
     }};
+}
+macro_rules! mut_bin_op_impl {
+    ($op_name:ident,(_,_) => $expr:expr) => {paste!{
+        impl<Left,Right> Op for [<$op_name:camel:upper>] <Left,Right>{
+            #[inline(always)]
+            default fn calculate(self) -> Result<Value>{
+                $expr
+            }
+        }
+    }};
 
-    (mut $op_name:ident,($left_var:ident:$left_ty:ty,$right_var:ident:$right_ty:ty) => $expr:expr) => {paste!{
-        impl<'a> OpMut for [<$op_name:camel:upper>]<&'a mut $left_ty,&'a $right_ty>{
+    ($op_name:ident,($left_var:ident:$left_ty:ty,$right_var:ident:$right_ty:ty) => $expr:expr) => {paste!{
+        impl<'a> Op for [<$op_name:camel:upper>]<&'a mut $left_ty,&'a $right_ty>{
             #[inline(always)]
             fn calculate(self) -> Result<Value>{
                 let Self(
                     $left_var,
                     $right_var,
                 ) = self;
-                $expr
-            }
-        }
-    }};
-
-    (mut $op_name:ident,(_,_) => $expr:expr) => {paste!{
-        impl<Left,Right> OpMut for [<$op_name:camel:upper>] <Left,Right>{
-            default fn calculate(self) -> Result<Value>{
                 $expr
             }
         }
@@ -56,6 +65,7 @@ macro_rules! def_bin_op_struct {
         );
 
         impl<Left,Right> [<$op_name:camel:upper>]<Left,Right>{
+            #[inline(always)]
             pub fn new(left:Left,right:Right)->Self{
                 Self(
                     left,
@@ -68,48 +78,101 @@ macro_rules! def_bin_op_struct {
 
 macro_rules! mut_bin_op_def {
     ( $( mut $op_name:ident =>  { $($args:tt => $body:expr ,)* })* ) => {paste!{
-        pub trait OpMut {
-            fn calculate(self) -> Result<Value>;
-        }
-
         $(
             def_bin_op_struct!($op_name);
 
-            $(bin_op_impl!{mut $op_name,$args => $body})*
-
-            pub fn $op_name<Left,Right>(left:&mut Left,right:&Right)->Result<Value>{
-                [<$op_name:camel:upper>]::new(left,right).calculate()
+            $(mut_bin_op_impl!{$op_name,$args => $body})*
+            #[inline(always)]
+            pub fn $op_name(left:&mut RegType,right:&RegType)->Result<Value>{
+                match_2_reg_type!((left,right),left,right,{
+                    [<$op_name:camel:upper>]::new(left.unbox_mut()?,right.unbox_const()?)
+                        .calculate()
+                })
             }
         )*
     }}
 }
 macro_rules! bin_op_def {
     ( $( $op_name:ident => { $($args:tt => $body:expr ,)* })* ) => {paste!{
-        pub trait Op {
-            fn calculate(self) -> Result<Value>;
-        }
+
         $(
             def_bin_op_struct!( $op_name );
 
             $(bin_op_impl!{$op_name,$args => $body})*
-
-            pub fn $op_name<Left,Right>(left:&Left,right:&Right)->Result<Value>{
-                [<$op_name:camel:upper>]::new(left,right).calculate()
+            #[inline(always)]
+            pub fn $op_name(left:&RegType,right:&RegType)->Result<Value>{
+                match_2_reg_type!((left,right),left,right,{
+                    [<$op_name:camel:upper>]::new(left.unbox_const()?,right.unbox_const()?)
+                        .calculate()
+                })
             }
         )*
     }}
+}
+
+macro_rules! def_unary_op_struct {
+    ($op_name:ident) => {paste!{
+        pub struct [<$op_name:camel:upper>]<Left>(
+            Left,
+        );
+
+        impl<Left> [<$op_name:camel:upper>]<Left>{
+            #[inline(always)]
+            pub fn new(left:Left)->Self{
+                Self(
+                    left,
+                )
+            }
+        }
+    }};
+}
+
+macro_rules! unary_op_impl {
+    ($op_name:ident,(_) => $expr:expr) => {paste!{
+        impl<Left> Op for [<$op_name:camel:upper>] <Left>{
+            #[inline(always)]
+            default fn calculate(self) -> Result<Value>{
+                $expr
+            }
+        }
+    }};
+
+    ($op_name:ident,($left_var:ident:$left_ty:ty) => $expr:expr) => {paste!{
+        impl<'a> Op for [<$op_name:camel:upper>]<&'a $left_ty>{
+            #[inline(always)]
+            fn calculate(self) -> Result<Value>{
+                let Self(
+                    $left_var,
+                ) = self;
+                $expr
+            }
+        }
+    }};
+}
+
+macro_rules! def_unary_op {
+    ( $( $op_name:ident => { $($args:tt => $body:expr ,)* })* ) => {paste!{
+        $(
+            def_unary_op_struct!( $op_name );
+
+            $(unary_op_impl!{$op_name,$args => $body})*
+            #[inline(always)]
+            pub fn $op_name(left:&RegType)->Result<Value>{
+                match_reg_type!((left),left,{
+                    [<$op_name:camel:upper>]::new(left.unbox_const()?)
+                        .calculate()
+                })
+            }
+        )*
+    }};
 }
 
 ///
 /// value types
 ///
 pub trait ValueType{
-    fn into_reg(self) -> RegType;
+    fn load_variable(&self, mutable:bool) -> RegType;
 }
-
-type Integer = i64;
-type Float   = f64;
-type Bool    = bool;
 
 #[mux]
 #[derive(Debug)]
@@ -118,26 +181,299 @@ pub enum Value{
     Float(Float),
     Bool(Bool),
 }
+impl Value{
+    #[inline(always)]
+    pub fn load_variable(&self,mutable:bool)->RegType{
+        match_value!(self,val,{
+            val.load_variable(mutable)
+        })
+    }
+}
 
-
-
-
+type Integer = i64;
+type Float   = f64;
+type Bool    = bool;
 
 impl ValueType for Integer{
-    fn into_reg(self) -> RegType {
-        RegType::InlineInteger(InlineInteger::new(self))
+    #[inline(always)]
+    fn load_variable(&self, mutable:bool) -> RegType {
+        if mutable{
+            RegType::InlineInteger(InlineInteger::new(*self))
+        }else{
+            RegType::ConstInlineInteger(InlineInteger::new(*self))
+        }
     }
 }
 
 impl ValueType for Float{
-    fn into_reg(self) -> RegType {
-        RegType::InlineFloat(InlineFloat::new(self))
+    #[inline(always)]
+    fn load_variable(&self, mutable:bool) -> RegType {
+        if mutable{
+            RegType::InlineFloat(InlineFloat::new(*self))
+        }else{
+            RegType::ConstInlineFloat(InlineFloat::new(*self))
+        }
     }
 }
 
 impl ValueType for Bool{
-    fn into_reg(self) -> RegType {
-        RegType::InlineBool(InlineBool::new(self))
+    #[inline(always)]
+    fn load_variable(&self, mutable:bool) -> RegType {
+        if mutable{
+            RegType::InlineBool(InlineBool::new(*self))
+        }else{
+            RegType::ConstInlineBool(InlineBool::new(*self))
+        }
+    }
+
+}
+
+
+pub trait RegTy{
+    type Output;
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output>;
+
+    #[inline(always)]
+    fn unbox_mut(&mut self) -> Result<&mut Self::Output>{
+        Err(MutabilityError::new().into())
+    }
+}
+
+#[mux]
+pub enum RegType{
+    InlineInteger(InlineInteger<true>),
+    InlineFloat(InlineFloat<true>),
+    InlineBool(InlineBool<true>),
+
+    ConstInlineInteger(InlineInteger<false>),
+    ConstInlineFloat(InlineFloat<false>),
+    ConstInlineBool(InlineBool<false>),
+
+    RefInteger(RefInteger<true>),
+    RefFloat(RefFloat<true>),
+    RefBool(RefBool<true>),
+
+    ConstRefInteger(RefInteger<false>),
+    ConstRefFloat(RefFloat<false>),
+    ConstRefBool(RefBool<false>),
+
+    RefNil(RefNil<true>),
+    ConstRefNil(RefNil<false>),
+}
+
+impl Default for RegType{
+    fn default() -> Self {
+        RegType::RefNil(RefNil)
+    }
+}
+
+impl Debug for RegType{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+
+        match_reg_type!(self,var,{
+            write!(f,"({:?})",var.unbox_const())
+        })
+    }
+}
+
+pub struct InlineInteger<const MUTABLE:Bool>(Integer);
+pub struct InlineFloat<const MUTABLE:Bool>(Float);
+pub struct InlineBool<const MUTABLE:Bool>(Bool);
+
+pub struct RefInteger<const MUTABLE:Bool>(RefCount<Integer>);
+pub struct RefFloat<const MUTABLE:Bool>(RefCount<Float>);
+pub struct RefBool<const MUTABLE:Bool>(RefCount<Bool>);
+
+pub struct ConstInteger(Integer);
+pub struct ConstFloat(Float);
+pub struct ConstBool(Bool);
+
+
+pub struct RefNil<const MUTABLE:Bool>;
+
+impl<const MUTABLE:bool> InlineInteger<MUTABLE>{
+    fn new(val:Integer)->Self{
+        Self(val)
+    }
+}
+
+impl<const MUTABLE:bool> RegTy for InlineInteger<MUTABLE>{
+    type Output = Integer;
+
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
+        Ok(&self.0)
+    }
+
+    #[inline(always)]
+    fn unbox_mut(&mut self) -> Result<&mut Self::Output> {
+        if MUTABLE{
+            Ok(&mut self.0)
+        }else{
+            Err(MutabilityError::new().into())
+        }
+    }
+}
+
+impl<const MUTABLE:bool> InlineFloat<MUTABLE>{
+    fn new(val:Float)->Self{
+        Self(val)
+    }
+}
+
+impl<const MUTABLE:bool> RegTy for InlineFloat<MUTABLE>{
+    type Output = Float;
+
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
+        Ok(&self.0)
+    }
+
+    #[inline(always)]
+    fn unbox_mut(&mut self) -> Result<&mut Self::Output> {
+        if MUTABLE{
+            Ok(&mut self.0)
+        }else{
+            Err(MutabilityError::new().into())
+        }
+    }
+}
+
+impl<const MUTABLE:bool> InlineBool<MUTABLE>{
+    fn new(val:Bool)->Self{
+        Self(val)
+    }
+}
+
+impl<const MUTABLE:bool> RegTy for InlineBool<MUTABLE>{
+    type Output = Bool;
+
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
+        Ok(&self.0)
+    }
+
+    #[inline(always)]
+    fn unbox_mut(&mut self) -> Result<&mut Self::Output> {
+        if MUTABLE{
+            Ok(&mut self.0)
+        }else{
+            Err(MutabilityError::new().into())
+        }
+    }
+}
+
+impl<const MUTABLE:bool> RegTy for RefInteger<MUTABLE>{
+    type Output = Integer;
+
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
+        Ok(&*self.0)
+    }
+
+    #[inline(always)]
+    fn unbox_mut(&mut self) -> Result<&mut Self::Output> {
+        if MUTABLE{
+            Ok(&mut *self.0)
+        }else{
+            Err(MutabilityError::new().into())
+        }
+    }
+}
+
+impl<const MUTABLE:bool> RegTy for RefFloat<MUTABLE>{
+    type Output = Float;
+
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
+        Ok(&*self.0)
+    }
+
+    #[inline(always)]
+    fn unbox_mut(&mut self) -> Result<&mut Self::Output> {
+        if MUTABLE{
+            Ok(&mut *self.0)
+        }else{
+            Err(MutabilityError::new().into())
+        }
+    }
+}
+
+impl<const MUTABLE:bool> RegTy for RefBool<MUTABLE>{
+    type Output = Bool;
+
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
+        Ok(&*self.0)
+    }
+
+    #[inline(always)]
+    fn unbox_mut(&mut self) -> Result<&mut Self::Output> {
+        if MUTABLE{
+            Ok(&mut *self.0)
+        }else{
+            Err(MutabilityError::new().into())
+        }
+    }
+}
+
+impl ConstInteger{
+    pub fn new(val:Integer)->Self{
+        Self(val)
+    }
+}
+
+impl RegTy for ConstInteger {
+    type Output = Integer;
+
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
+        Ok(&self.0)
+    }
+}
+
+impl ConstFloat{
+    pub fn new(val:Float)->Self{
+        Self(val)
+    }
+}
+
+impl RegTy for ConstFloat {
+    type Output = Float;
+
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
+        Ok(&self.0)
+    }
+}
+
+impl ConstBool{
+    pub fn new(val:Bool)->Self{
+        Self(val)
+    }
+}
+
+impl RegTy for ConstBool {
+    type Output = Bool;
+
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
+        Ok(&self.0)
+    }
+}
+
+impl<const MUTABLE:bool> RegTy for RefNil<MUTABLE>{
+    type Output = ();
+
+    #[inline(always)]
+    fn unbox_const(&self) -> Result<&Self::Output> {
+        Err(DerefNull::new().into())
+    }
+
+    #[inline(always)]
+    fn unbox_mut(&mut self) -> Result<&mut Self::Output> {
+        Err(DerefNull::new().into())
     }
 }
 
@@ -376,236 +712,38 @@ mut_bin_op_def!{
     }
 }
 
-pub trait RegTy{
-    type Output;
-    #[inline(always)]
-    fn unbox_const(&self) -> Result<&Self::Output>;
-
-    #[inline(always)]
-    fn unbox_mut(&mut self) -> Result<&mut Self::Output>{
-        Err(MutabilityError::new().into())
+def_unary_op!{
+    op_bit_not => {
+        (left:Integer) => Ok((!left).into()),
+        (left:Bool   ) => Ok((!left).into()),
+        (_) => Err(UnsupportedOp::new("op_bit_not").into()),
+    }
+    op_not => {
+        (left:Bool   ) => Ok((!left).into()),
+        (_) => Err(UnsupportedOp::new("op_not").into()),
+    }
+    op_neg => {
+        (left:Integer) => Ok((-left).into()),
+        (left:Float  ) => Ok((-left).into()),
+        (_) => Err(UnsupportedOp::new("op_neg").into()),
+    }
+    op_pos => {
+        (left:Integer) => Ok((*left).into()),
+        (left:Float  ) => Ok((*left).into()),
+        (_) => Err(UnsupportedOp::new("op_pos").into()),
     }
 }
 
-#[mux]
-pub enum RegType{
-    InlineInteger(InlineInteger<true>),
-    InlineFloat(InlineFloat<true>),
-    InlineBool(InlineBool<true>),
-
-    ConstInlineInteger(InlineInteger<false>),
-    ConstInlineFloat(InlineFloat<false>),
-    ConstInlineBool(InlineBool<false>),
-
-    RefInteger(RefInteger<true>),
-    RefFloat(RefFloat<true>),
-    RefBool(RefBool<true>),
-
-    ConstRefInteger(RefInteger<false>),
-    ConstRefFloat(RefFloat<false>),
-    ConstRefBool(RefBool<false>),
-
-    RefNil(RefNil<true>),
-    ConstRefNil(RefNil<false>),
-}
-
-pub struct InlineInteger<const MUTABLE:Bool>(Integer);
-
-pub struct InlineFloat<const MUTABLE:Bool>(Float);
-
-pub struct InlineBool<const MUTABLE:Bool>(Bool);
-
-
-pub struct RefInteger<const MUTABLE:Bool>(RefCount<Integer>);
-
-pub struct RefFloat<const MUTABLE:Bool>(RefCount<Float>);
-
-pub struct RefBool<const MUTABLE:Bool>(RefCount<Bool>);
-
-
-pub struct ConstInteger(Integer);
-
-pub struct ConstFloat(Float);
-
-pub struct ConstBool(Bool);
-
-
-pub struct RefNil<const MUTABLE:Bool>;
-
-impl<const MUTABLE:bool> InlineInteger<MUTABLE>{
-    fn new(val:Integer)->Self{
-        Self(val)
-    }
-}
-
-impl<const MUTABLE:bool> RegTy for InlineInteger<MUTABLE>{
-    type Output = Integer;
-
-    #[inline(always)]
-    fn unbox_const(&self) -> Result<&Self::Output> {
-        Ok(&self.0)
-    }
-
-    #[inline(always)]
-    fn unbox_mut(&mut self) -> Result<&mut Self::Output> {
-        if MUTABLE{
-            Ok(&mut self.0)
-        }else{
-            Err(MutabilityError::new().into())
-        }
-    }
-}
-
-impl<const MUTABLE:bool> InlineFloat<MUTABLE>{
-    fn new(val:Float)->Self{
-        Self(val)
-    }
-}
-
-impl<const MUTABLE:bool> RegTy for InlineFloat<MUTABLE>{
-    type Output = Float;
-
-    #[inline(always)]
-    fn unbox_const(&self) -> Result<&Self::Output> {
-        Ok(&self.0)
-    }
-
-    #[inline(always)]
-    fn unbox_mut(&mut self) -> Result<&mut Self::Output> {
-        if MUTABLE{
-            Ok(&mut self.0)
-        }else{
-            Err(MutabilityError::new().into())
-        }
-    }
-}
-
-impl<const MUTABLE:bool> InlineBool<MUTABLE>{
-    fn new(val:Bool)->Self{
-        Self(val)
-    }
-}
-
-impl<const MUTABLE:bool> RegTy for InlineBool<MUTABLE>{
-    type Output = Bool;
-
-    #[inline(always)]
-    fn unbox_const(&self) -> Result<&Self::Output> {
-        Ok(&self.0)
-    }
-
-    #[inline(always)]
-    fn unbox_mut(&mut self) -> Result<&mut Self::Output> {
-        if MUTABLE{
-            Ok(&mut self.0)
-        }else{
-            Err(MutabilityError::new().into())
-        }
-    }
-}
-
-impl<const MUTABLE:bool> RegTy for RefInteger<MUTABLE>{
-    type Output = Integer;
-
-    #[inline(always)]
-    fn unbox_const(&self) -> Result<&Self::Output> {
-        Ok(&*self.0)
-    }
-
-    #[inline(always)]
-    fn unbox_mut(&mut self) -> Result<&mut Self::Output> {
-        if MUTABLE{
-            Ok(&mut *self.0)
-        }else{
-            Err(MutabilityError::new().into())
-        }
-    }
-}
-
-impl<const MUTABLE:bool> RegTy for RefFloat<MUTABLE>{
-    type Output = Float;
-
-    #[inline(always)]
-    fn unbox_const(&self) -> Result<&Self::Output> {
-        Ok(&*self.0)
-    }
-
-    #[inline(always)]
-    fn unbox_mut(&mut self) -> Result<&mut Self::Output> {
-        if MUTABLE{
-            Ok(&mut *self.0)
-        }else{
-            Err(MutabilityError::new().into())
-        }
-    }
-}
-
-impl<const MUTABLE:bool> RegTy for RefBool<MUTABLE>{
-    type Output = Bool;
-
-    #[inline(always)]
-    fn unbox_const(&self) -> Result<&Self::Output> {
-        Ok(&*self.0)
-    }
-
-    #[inline(always)]
-    fn unbox_mut(&mut self) -> Result<&mut Self::Output> {
-        if MUTABLE{
-            Ok(&mut *self.0)
-        }else{
-            Err(MutabilityError::new().into())
-        }
-    }
-}
-
-impl RegTy for ConstInteger {
-    type Output = Integer;
-
-    #[inline(always)]
-    fn unbox_const(&self) -> Result<&Self::Output> {
-        Ok(&self.0)
-    }
-}
-
-impl RegTy for ConstFloat {
-    type Output = Float;
-
-    #[inline(always)]
-    fn unbox_const(&self) -> Result<&Self::Output> {
-        Ok(&self.0)
-    }
-}
-
-impl RegTy for ConstBool {
-    type Output = Bool;
-
-    #[inline(always)]
-    fn unbox_const(&self) -> Result<&Self::Output> {
-        Ok(&self.0)
-    }
-}
-
-impl<const MUTABLE:bool> RegTy for RefNil<MUTABLE>{
-    type Output = ();
-
-    #[inline(always)]
-    fn unbox_const(&self) -> Result<&Self::Output> {
-        Err(DerefNull::new().into())
-    }
-
-    #[inline(always)]
-    fn unbox_mut(&mut self) -> Result<&mut Self::Output> {
-        Err(DerefNull::new().into())
-    }
-}
 
 #[test]
 fn test(){
-    println!("1+1={:?}",op_or(&0.0,&0.0));
-    println!("1+1={:?}",op_or(&0i64,&0i64));
     let a = RegType::InlineInteger(InlineInteger(1));
-    println!("1+1={:?}",op_bit_or(&0,&0));
-    println!("1+1={:?}",op_assign(&mut 0,&0));
+    let b = RegType::InlineInteger(InlineInteger(1));
+
+    let c = RegType::InlineFloat(InlineFloat(1.0));
+    let res = op_bit_or(&a,&b).unwrap().load_variable(true);
+    println!("1+1={:?}",op_bit_or(&a,&b));
+
 
 }
 

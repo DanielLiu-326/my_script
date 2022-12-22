@@ -35,7 +35,9 @@ pub fn mux(_attr:TokenStream,mut input:TokenStream) -> TokenStream{
             ($input:expr,$var:ident,$output:expr) => {paste!{{
                 use #enum_ty :: *;
                 match $input{
-                    #(#vars ($var) => {$output})*
+                    #(#vars ($var) => {
+                        $output
+                    })*
                 }
             }}};
         }
@@ -45,7 +47,7 @@ pub fn mux(_attr:TokenStream,mut input:TokenStream) -> TokenStream{
         let vars1 = var_map.values();
         vars1.map(|b|{
             quote!(
-                (#a($left),#b($right)) => $output ,
+                (#a($left),#b($right)) => $output,
             )
         }).fold(quote!(),|mut acc,now|{
             acc.extend(now);
