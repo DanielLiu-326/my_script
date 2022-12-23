@@ -67,13 +67,13 @@ pub enum OpCode {
     // LoadFromConst3(OpReg,ConstAddr),    //从常量区3加载数据
 
 
-    //创建内嵌式Bool
-    LoadTrue(OpReg),
-    LoadFalse(OpReg),
-
-    //创建内嵌式整数 -65535~65535
-    LoadPosShort(OpReg,u16),
-    LoadNegShort(OpReg,u16),
+    // //创建内嵌式Bool
+    // LoadTrue(OpReg),
+    // LoadFalse(OpReg),
+    //
+    // //创建内嵌式整数 -65535~65535
+    // LoadPosShort(OpReg,u16),
+    // LoadNegShort(OpReg,u16),
 
     // //创建数组 postponed
     // LoadNewArray(OpReg,u16),	    //存储寄存器，初始大小
@@ -85,8 +85,8 @@ pub enum OpCode {
     // //创建闭包，添加捕获变量 postponed
     // CapValue(OpReg,OpReg,OpReg),
 
-    //创建Nil
-    LoadNil(OpReg),
+    // //创建Nil
+    // LoadNil(OpReg),
 
     //相对跳跃
     JmpPrev(u8,u8,u8),

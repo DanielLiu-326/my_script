@@ -1,7 +1,7 @@
 #![feature(unboxed_closures,fn_traits,ptr_metadata,auto_traits,negative_impls)]
 #![feature(specialization)]
 
-
+//
 use crate::opcode::OpCode;
 use crate::stack::VmStack;
 use crate::vm::VM;
@@ -63,12 +63,7 @@ use crate::vm::VM;
 
 
 
-// extern crate core;
-//
-// use crate::opcode::OpCode;
-// use crate::types::Const;
-// use crate::util::{allocate_value};
-// use crate::vm::VM;
+
 
 mod opcode;
 mod errors;
@@ -79,11 +74,8 @@ mod vm;
 mod stack;
 mod const_table;
 
+
 use crate::types::Value;
-// use crate::opcode::OpCode;
-// use crate::stack::VmStack;
-// use crate::types::Value;
-// use crate::vm::VM;
 
 fn main() {
 

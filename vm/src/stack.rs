@@ -45,7 +45,7 @@ impl Debug for VmStack{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {unsafe{
         writeln!(f,"Stack Dbg:")?;
         for x in 0..(self.bs + 256){
-            writeln!(f,"{:?}",self.stack[x])?
+            writeln!(f,"{:?}",self.stack[x].unbox_const())?
         }
         writeln!(f,"----------------------------")
     }}

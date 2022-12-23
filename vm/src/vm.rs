@@ -130,18 +130,21 @@ impl VM{
             OpCode::RefAssign(a, b) => {
                 unimplemented!()
             }
-            OpCode::ValAssign(_, _) => {
-                unimplemented!()
+            OpCode::ValAssign(a, b) => {
+                //todo op_assign(self.register_mut(a),self.register(b))?;
+                self.pc+=1;
             }
+            OpCode::JmpPrev(a,b,c)  => {
+                let pos = OpCode::JmpPrev(a,b,c).get_u24();
+                self.pc -= pos as usize;
+            }
+            OpCode::JmpPost(a,b,c)  => {
+                let pos = OpCode::JmpPost(a,b,c).get_u24();
+                self.pc += pos as usize;
+            }
+            OpCode::Chk(a)  => {
 
-            OpCode::LoadTrue(_) => {unimplemented!()}
-            OpCode::LoadFalse(_) => {unimplemented!()}
-            OpCode::LoadPosShort(_, _) => {unimplemented!()}
-            OpCode::LoadNegShort(_, _) => {unimplemented!()}
-            OpCode::LoadNil(_) => {unimplemented!()}
-            OpCode::JmpPrev(_,_,_)  => {unimplemented!()}
-            OpCode::JmpPost(_,_,_)  => {unimplemented!()}
-            OpCode::Chk(_)  => {unimplemented!()}
+            }
             OpCode::Call(_) => {unimplemented!()}
             OpCode::CallConst0(_) => {unimplemented!()}
             OpCode::Ret => {unimplemented!()}

@@ -1,244 +1,116 @@
-use std::any::type_name;
-use std::fmt::{Debug, Formatter, write};
-use paste::paste;
-use overloadf::overload;
-use crate::errors::*;
-use crate::mem_collection::RefCount;
+use std::collections::hash_map::Values;
 use macros::mux;
+use paste::paste;
+use crate::errors::*;
+use crate::mem_collection::RefConst;
+use crate::util::UncheckMut;
 
-pub trait Op {
-    fn calculate(self) -> Result<Value>;
+//*****************************************************
+pub trait Val{
+    fn load_variable(&self,mutable:bool) -> RegType;
 }
 
-/// Implements the function for ops
-macro_rules! bin_op_impl {
-    ($op_name:ident,(_,_) => $expr:expr) => {paste!{
-        impl<Left,Right> Op for [<$op_name:camel:upper>] <Left,Right>{
-            #[inline(always)]
-            default fn calculate(self) -> Result<Value>{
-                $expr
-            }
-        }
-    }};
-
-    ($op_name:ident,($left_var:ident:$left_ty:ty,$right_var:ident:$right_ty:ty) => $expr:expr) => {paste!{
-        impl<'a> Op for [<$op_name:camel:upper>]<&'a $left_ty,&'a $right_ty>{
-            #[inline(always)]
-            fn calculate(self) -> Result<Value>{
-                let Self(
-                    $left_var,
-                    $right_var,
-                ) = self;
-                $expr
-            }
-        }
-    }};
-}
-macro_rules! mut_bin_op_impl {
-    ($op_name:ident,(_,_) => $expr:expr) => {paste!{
-        impl<Left,Right> Op for [<$op_name:camel:upper>] <Left,Right>{
-            #[inline(always)]
-            default fn calculate(self) -> Result<Value>{
-                $expr
-            }
-        }
-    }};
-
-    ($op_name:ident,($left_var:ident:$left_ty:ty,$right_var:ident:$right_ty:ty) => $expr:expr) => {paste!{
-        impl<'a> Op for [<$op_name:camel:upper>]<&'a mut $left_ty,&'a $right_ty>{
-            #[inline(always)]
-            fn calculate(self) -> Result<Value>{
-                let Self(
-                    $left_var,
-                    $right_var,
-                ) = self;
-                $expr
-            }
-        }
-    }};
-}
-macro_rules! def_bin_op_struct {
-    ($op_name:ident) => {paste!{
-        pub struct [<$op_name:camel:upper>]<Left,Right>(
-            Left,
-            Right,
-        );
-
-        impl<Left,Right> [<$op_name:camel:upper>]<Left,Right>{
-            #[inline(always)]
-            pub fn new(left:Left,right:Right)->Self{
-                Self(
-                    left,
-                    right,
-                )
-            }
-        }
-    }};
-}
-
-macro_rules! mut_bin_op_def {
-    ( $( mut $op_name:ident =>  { $($args:tt => $body:expr ,)* })* ) => {paste!{
-        $(
-            def_bin_op_struct!($op_name);
-
-            $(mut_bin_op_impl!{$op_name,$args => $body})*
-            #[inline(always)]
-            pub fn $op_name(left:&mut RegType,right:&RegType)->Result<Value>{
-                match_2_reg_type!((left,right),left,right,{
-                    [<$op_name:camel:upper>]::new(left.unbox_mut()?,right.unbox_const()?)
-                        .calculate()
-                })
-            }
-        )*
-    }}
-}
-macro_rules! bin_op_def {
-    ( $( $op_name:ident => { $($args:tt => $body:expr ,)* })* ) => {paste!{
-
-        $(
-            def_bin_op_struct!( $op_name );
-
-            $(bin_op_impl!{$op_name,$args => $body})*
-            #[inline(always)]
-            pub fn $op_name(left:&RegType,right:&RegType)->Result<Value>{
-                match_2_reg_type!((left,right),left,right,{
-                    [<$op_name:camel:upper>]::new(left.unbox_const()?,right.unbox_const()?)
-                        .calculate()
-                })
-            }
-        )*
-    }}
-}
-
-macro_rules! def_unary_op_struct {
-    ($op_name:ident) => {paste!{
-        pub struct [<$op_name:camel:upper>]<Left>(
-            Left,
-        );
-
-        impl<Left> [<$op_name:camel:upper>]<Left>{
-            #[inline(always)]
-            pub fn new(left:Left)->Self{
-                Self(
-                    left,
-                )
-            }
-        }
-    }};
-}
-
-macro_rules! unary_op_impl {
-    ($op_name:ident,(_) => $expr:expr) => {paste!{
-        impl<Left> Op for [<$op_name:camel:upper>] <Left>{
-            #[inline(always)]
-            default fn calculate(self) -> Result<Value>{
-                $expr
-            }
-        }
-    }};
-
-    ($op_name:ident,($left_var:ident:$left_ty:ty) => $expr:expr) => {paste!{
-        impl<'a> Op for [<$op_name:camel:upper>]<&'a $left_ty>{
-            #[inline(always)]
-            fn calculate(self) -> Result<Value>{
-                let Self(
-                    $left_var,
-                ) = self;
-                $expr
-            }
-        }
-    }};
-}
-
-macro_rules! def_unary_op {
-    ( $( $op_name:ident => { $($args:tt => $body:expr ,)* })* ) => {paste!{
-        $(
-            def_unary_op_struct!( $op_name );
-
-            $(unary_op_impl!{$op_name,$args => $body})*
-            #[inline(always)]
-            pub fn $op_name(left:&RegType)->Result<Value>{
-                match_reg_type!((left),left,{
-                    [<$op_name:camel:upper>]::new(left.unbox_const()?)
-                        .calculate()
-                })
-            }
-        )*
-    }};
-}
-
-///
-/// value types
-///
-pub trait ValueType{
-    fn load_variable(&self, mutable:bool) -> RegType;
-}
+pub type Integer = i64;
+pub type Float   = f64;
+pub type Bool    = bool;
+pub type Nil     = ();
 
 #[mux]
 #[derive(Debug)]
 pub enum Value{
-    Integer(Integer),
-    Float(Float),
-    Bool(Bool),
+    Integer (Integer),
+    Float   (Float),
+    Bool    (Bool),
+    Nil     (Nil),
 }
+
+#[mux]
+#[derive(Debug)]
+pub enum RefConstValue<'a>{
+    Integer (&'a Integer),
+    Float   (&'a Float),
+    Bool    (&'a Bool),
+    Nil     (&'a Nil),
+}
+
+#[mux]
+#[derive(Debug)]
+pub enum RefMutValue<'a>{
+    Integer (&'a mut Integer),
+    Float   (&'a mut Float),
+    Bool    (&'a mut Bool),
+    Nil     (&'a mut Nil),
+}
+
+impl Val for Integer{
+    #[inline(always)]
+    fn load_variable(&self, mutable: bool) -> RegType {
+        if mutable{
+            InlineInteger::<true>::new(*self).into()
+        }else{
+            InlineInteger::<false>::new(*self).into()
+        }
+    }
+}
+impl Val for Float{
+    #[inline(always)]
+    fn load_variable(&self, mutable: bool) -> RegType {
+        if mutable{
+            InlineFloat::<true>::new(*self).into()
+        }else{
+            InlineFloat::<false>::new(*self).into()
+        }
+    }
+}
+impl Val for Bool{
+    #[inline(always)]
+    fn load_variable(&self, mutable: bool) -> RegType {
+        if mutable{
+            InlineBool::<true>::new(*self).into()
+        }else{
+            InlineBool::<false>::new(*self).into()
+        }
+    }
+}
+impl Val for Nil{
+    #[inline(always)]
+    fn load_variable(&self, mutable: bool) -> RegType {
+        if mutable{
+            RefNil::<true>::new().into()
+        }else{
+            RefNil::<false>::new().into()
+        }
+    }
+}
+
 impl Value{
     #[inline(always)]
-    pub fn load_variable(&self,mutable:bool)->RegType{
-        match_value!(self,val,{
+    pub fn load_variable(&self,mutable:bool) -> RegType{
+        value_match!(self,val,{
             val.load_variable(mutable)
         })
     }
 }
 
-type Integer = i64;
-type Float   = f64;
-type Bool    = bool;
-
-impl ValueType for Integer{
-    #[inline(always)]
-    fn load_variable(&self, mutable:bool) -> RegType {
-        if mutable{
-            RegType::InlineInteger(InlineInteger::new(*self))
-        }else{
-            RegType::ConstInlineInteger(InlineInteger::new(*self))
-        }
-    }
-}
-
-impl ValueType for Float{
-    #[inline(always)]
-    fn load_variable(&self, mutable:bool) -> RegType {
-        if mutable{
-            RegType::InlineFloat(InlineFloat::new(*self))
-        }else{
-            RegType::ConstInlineFloat(InlineFloat::new(*self))
-        }
-    }
-}
-
-impl ValueType for Bool{
-    #[inline(always)]
-    fn load_variable(&self, mutable:bool) -> RegType {
-        if mutable{
-            RegType::InlineBool(InlineBool::new(*self))
-        }else{
-            RegType::ConstInlineBool(InlineBool::new(*self))
-        }
-    }
-
-}
-
+//*****************************************************
 
 pub trait RegTy{
-    type Output;
     #[inline(always)]
-    fn unbox_const(&self) -> Result<&Self::Output>;
-
-    #[inline(always)]
-    fn unbox_mut(&mut self) -> Result<&mut Self::Output>{
+    fn unbox_mut(&self)->Result<RefMutValue>{
         Err(MutabilityError::new().into())
     }
+
+    fn unbox_const(&self)->RefConstValue;
+
+    fn clone_ref(&self) -> RegType{
+        todo!()
+    }
 }
+
+pub struct InlineInteger<const MUTABLE:bool>(UncheckMut<Integer>);
+pub struct InlineFloat<const MUTABLE:bool>  (UncheckMut<Float>);
+pub struct InlineBool<const MUTABLE:bool>   (UncheckMut<Bool>);
+pub struct RefNil<const MUTABLE:bool>       (UncheckMut<Nil>);
 
 #[mux]
 pub enum RegType{
@@ -250,244 +122,171 @@ pub enum RegType{
     ConstInlineFloat(InlineFloat<false>),
     ConstInlineBool(InlineBool<false>),
 
-    RefInteger(RefInteger<true>),
-    RefFloat(RefFloat<true>),
-    RefBool(RefBool<true>),
-
-    ConstRefInteger(RefInteger<false>),
-    ConstRefFloat(RefFloat<false>),
-    ConstRefBool(RefBool<false>),
-
     RefNil(RefNil<true>),
     ConstRefNil(RefNil<false>),
 }
-
 impl Default for RegType{
     fn default() -> Self {
-        RegType::RefNil(RefNil)
+        Self::RefNil(RefNil::new())
     }
 }
 
-impl Debug for RegType{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-
-        match_reg_type!(self,var,{
-            write!(f,"({:?})",var.unbox_const())
+impl RegType{
+    #[inline(always)]
+    pub fn unbox_const(&self) -> RefConstValue{
+        reg_type_match!(self,reg,{
+            reg.unbox_const().into()
+        })
+    }
+    #[inline(always)]
+    pub fn unbox_mut(&self) -> Result<RefMutValue>{
+        reg_type_match!(self,reg,{
+            Ok(reg.unbox_mut()?.into())
         })
     }
 }
 
-pub struct InlineInteger<const MUTABLE:Bool>(Integer);
-pub struct InlineFloat<const MUTABLE:Bool>(Float);
-pub struct InlineBool<const MUTABLE:Bool>(Bool);
-
-pub struct RefInteger<const MUTABLE:Bool>(RefCount<Integer>);
-pub struct RefFloat<const MUTABLE:Bool>(RefCount<Float>);
-pub struct RefBool<const MUTABLE:Bool>(RefCount<Bool>);
-
-pub struct ConstInteger(Integer);
-pub struct ConstFloat(Float);
-pub struct ConstBool(Bool);
-
-
-pub struct RefNil<const MUTABLE:Bool>;
-
 impl<const MUTABLE:bool> InlineInteger<MUTABLE>{
     fn new(val:Integer)->Self{
-        Self(val)
-    }
-}
-
-impl<const MUTABLE:bool> RegTy for InlineInteger<MUTABLE>{
-    type Output = Integer;
-
-    #[inline(always)]
-    fn unbox_const(&self) -> Result<&Self::Output> {
-        Ok(&self.0)
-    }
-
-    #[inline(always)]
-    fn unbox_mut(&mut self) -> Result<&mut Self::Output> {
-        if MUTABLE{
-            Ok(&mut self.0)
-        }else{
-            Err(MutabilityError::new().into())
-        }
+        Self(UncheckMut::new(val))
     }
 }
 
 impl<const MUTABLE:bool> InlineFloat<MUTABLE>{
     fn new(val:Float)->Self{
-        Self(val)
-    }
-}
-
-impl<const MUTABLE:bool> RegTy for InlineFloat<MUTABLE>{
-    type Output = Float;
-
-    #[inline(always)]
-    fn unbox_const(&self) -> Result<&Self::Output> {
-        Ok(&self.0)
-    }
-
-    #[inline(always)]
-    fn unbox_mut(&mut self) -> Result<&mut Self::Output> {
-        if MUTABLE{
-            Ok(&mut self.0)
-        }else{
-            Err(MutabilityError::new().into())
-        }
+        Self(UncheckMut::new(val))
     }
 }
 
 impl<const MUTABLE:bool> InlineBool<MUTABLE>{
     fn new(val:Bool)->Self{
-        Self(val)
+        Self(UncheckMut::new(val))
     }
 }
 
-impl<const MUTABLE:bool> RegTy for InlineBool<MUTABLE>{
-    type Output = Bool;
-
+impl<const MUTABLE:Bool> RegTy for InlineInteger<MUTABLE>{
     #[inline(always)]
-    fn unbox_const(&self) -> Result<&Self::Output> {
-        Ok(&self.0)
+    fn unbox_const(&self) -> RefConstValue {
+        self.0.get().into()
     }
-
     #[inline(always)]
-    fn unbox_mut(&mut self) -> Result<&mut Self::Output> {
+    fn unbox_mut(&self) -> Result<RefMutValue> {
         if MUTABLE{
-            Ok(&mut self.0)
+            Ok(self.0.get_mut().into())
+        }else{
+            Err(MutabilityError::new().into())
+        }
+    }
+}
+impl<const MUTABLE:Bool> RegTy for InlineFloat<MUTABLE>{
+    #[inline(always)]
+    fn unbox_const(&self) -> RefConstValue {
+        self.0.get().into()
+    }
+    #[inline(always)]
+    fn unbox_mut(&self) -> Result<RefMutValue> {
+        if MUTABLE{
+            Ok(self.0.get_mut().into())
+        }else{
+            Err(MutabilityError::new().into())
+        }
+    }
+}
+impl<const MUTABLE:Bool> RegTy for InlineBool<MUTABLE>{
+    #[inline(always)]
+    fn unbox_const(&self) -> RefConstValue {
+        self.0.get().into()
+    }
+    #[inline(always)]
+    fn unbox_mut(&self) -> Result<RefMutValue> {
+        if MUTABLE{
+            Ok(self.0.get_mut().into())
+        }else{
+            Err(MutabilityError::new().into())
+        }
+    }
+}
+impl<const MUTABLE:Bool> RefNil<MUTABLE>{
+    pub fn new()->Self{
+        Self(UncheckMut::new(()))
+    }
+}
+impl<const MUTABLE:Bool> RegTy for RefNil<MUTABLE>{
+    #[inline(always)]
+    fn unbox_const(&self) -> RefConstValue {
+        self.0.get().into()
+    }
+    #[inline(always)]
+    fn unbox_mut(&self) -> Result<RefMutValue> {
+        if MUTABLE{
+            Ok(self.0.get_mut().into())
         }else{
             Err(MutabilityError::new().into())
         }
     }
 }
 
-impl<const MUTABLE:bool> RegTy for RefInteger<MUTABLE>{
-    type Output = Integer;
-
-    #[inline(always)]
-    fn unbox_const(&self) -> Result<&Self::Output> {
-        Ok(&*self.0)
-    }
-
-    #[inline(always)]
-    fn unbox_mut(&mut self) -> Result<&mut Self::Output> {
-        if MUTABLE{
-            Ok(&mut *self.0)
-        }else{
-            Err(MutabilityError::new().into())
-        }
-    }
+macro_rules! def_bin_op {
+    ($($op_name:ident => {$($pattern:tt => $output:expr,)*} )* ) => {
+        $(
+            #[inline(always)]
+            pub fn $op_name(left:&RegType,right:&RegType) -> Result<Value>{
+                use RefConstValue::*;
+                match (left.unbox_const(),right.unbox_const()){
+                    $(
+                        $pattern => {
+                            use crate::types::*; //to solve RefConstValue::Float and types::Float
+                            $output
+                        }
+                    )*
+                }
+            }
+        )*
+    };
 }
 
-impl<const MUTABLE:bool> RegTy for RefFloat<MUTABLE>{
-    type Output = Float;
-
-    #[inline(always)]
-    fn unbox_const(&self) -> Result<&Self::Output> {
-        Ok(&*self.0)
-    }
-
-    #[inline(always)]
-    fn unbox_mut(&mut self) -> Result<&mut Self::Output> {
-        if MUTABLE{
-            Ok(&mut *self.0)
-        }else{
-            Err(MutabilityError::new().into())
-        }
-    }
+macro_rules! def_mut_bin_op {
+    ($($op_name:ident => {$( $pattern:tt => $output:expr,)*} )* ) => {
+        $(
+            #[inline(always)]
+            pub fn $op_name(left:&RegType,right:&RegType) -> Result<Value>{
+                match (left.unbox_mut()?,right.unbox_const()){
+                    $(
+                        $pattern => {$output}
+                    )*
+                }
+            }
+        )*
+    };
+}
+macro_rules! def_unary_op {
+    ($($op_name:ident => {$( $pattern:tt => $output:expr,)*} )* ) => {
+        $(
+            #[inline(always)]
+            pub fn $op_name(left:&RegType) -> Result<Value>{
+                use crate::types::RefConstValue::*;
+                match (left.unbox_const()){
+                    $(
+                        $pattern => {
+                            use crate::types::*; //to solve RefConstValue::Float and types::Float
+                            $output
+                        }
+                    )*
+                }
+            }
+        )*
+    };
 }
 
-impl<const MUTABLE:bool> RegTy for RefBool<MUTABLE>{
-    type Output = Bool;
-
-    #[inline(always)]
-    fn unbox_const(&self) -> Result<&Self::Output> {
-        Ok(&*self.0)
-    }
-
-    #[inline(always)]
-    fn unbox_mut(&mut self) -> Result<&mut Self::Output> {
-        if MUTABLE{
-            Ok(&mut *self.0)
-        }else{
-            Err(MutabilityError::new().into())
-        }
-    }
-}
-
-impl ConstInteger{
-    pub fn new(val:Integer)->Self{
-        Self(val)
-    }
-}
-
-impl RegTy for ConstInteger {
-    type Output = Integer;
-
-    #[inline(always)]
-    fn unbox_const(&self) -> Result<&Self::Output> {
-        Ok(&self.0)
-    }
-}
-
-impl ConstFloat{
-    pub fn new(val:Float)->Self{
-        Self(val)
-    }
-}
-
-impl RegTy for ConstFloat {
-    type Output = Float;
-
-    #[inline(always)]
-    fn unbox_const(&self) -> Result<&Self::Output> {
-        Ok(&self.0)
-    }
-}
-
-impl ConstBool{
-    pub fn new(val:Bool)->Self{
-        Self(val)
-    }
-}
-
-impl RegTy for ConstBool {
-    type Output = Bool;
-
-    #[inline(always)]
-    fn unbox_const(&self) -> Result<&Self::Output> {
-        Ok(&self.0)
-    }
-}
-
-impl<const MUTABLE:bool> RegTy for RefNil<MUTABLE>{
-    type Output = ();
-
-    #[inline(always)]
-    fn unbox_const(&self) -> Result<&Self::Output> {
-        Err(DerefNull::new().into())
-    }
-
-    #[inline(always)]
-    fn unbox_mut(&mut self) -> Result<&mut Self::Output> {
-        Err(DerefNull::new().into())
-    }
-}
-
-/* operations */
-
-bin_op_def!{
+def_bin_op!{
     op_or  => {
         // Integer
-        (left:Integer,right:Integer) => Ok((*left != 0 || *right!=0).into()),
-        (left:Integer,right:Bool   ) => Ok((*left != 0 || *right).into()),
+        (Integer(left),Integer(right)) => Ok((*left != 0 || *right!=0).into()),
+        (Integer(left),Bool(right)   ) => Ok((*left != 0 || *right).into()),
 
         // Bool
-        (left:Bool   ,right:Integer) => Ok((*left || *right!=0).into()),
-        (left:Bool   ,right:Bool   ) => Ok((*left || *right).into()),
+        (Bool(left)   ,Integer(right)) => Ok((*left || *right!=0).into()),
+        (Bool(left)   ,Bool(right)   ) => Ok((*left || *right).into()),
 
         //default
         (_,_) => Result::Err(UnsupportedOp::new("op_or").into()),
@@ -495,12 +294,12 @@ bin_op_def!{
 
     op_and => {
         // Integer
-        (left:Integer,right:Integer) => Ok((*left != 0 && *right!=0).into()),
-        (left:Integer,right:Bool   ) => Ok((*left != 0 && *right).into()),
+        (Integer(left),Integer(right)) => Ok((*left != 0 && *right!=0).into()),
+        (Integer(left),Bool(right)   ) => Ok((*left != 0 && *right).into()),
 
         // Bool
-        (left:Bool   ,right:Integer) => Ok((*left && *right!=0).into()),
-        (left:Bool   ,right:Bool   ) => Ok((*left && *right).into()),
+        (Bool(left)   ,Integer(right)) => Ok((*left && *right!=0).into()),
+        (Bool(left)   ,Bool(right)   ) => Ok((*left && *right).into()),
 
         //default
         (_,_) => Err(UnsupportedOp::new("op_and").into()),
@@ -508,10 +307,10 @@ bin_op_def!{
 
     op_bit_or => {
         // Integer
-        (left:Integer,right:Integer) => Ok((*left | *right).into()),
+        (Integer(left),Integer(right)) => Ok((*left | *right).into()),
 
         // Bool
-        (left:Bool   ,right:Bool   ) => Ok((*left | *right).into()),
+        (Bool(left)   ,Bool(right)   ) => Ok((*left | *right).into()),
 
         //default
         (_,_) => Err(UnsupportedOp::new("op_bit_or").into()),
@@ -519,10 +318,10 @@ bin_op_def!{
 
     op_bit_xor => {
         // Integer
-        (left:Integer,right:Integer) => Ok((*left ^ *right).into()),
+        (Integer(left),Integer(right)) => Ok((*left ^ *right).into()),
 
         // Bool
-        (left:Bool   ,right:Bool   ) => Ok((*left ^ *right).into()),
+        (Bool(left)   ,Bool(right)   ) => Ok((*left ^ *right).into()),
 
         //default
         (_,_) => Err(UnsupportedOp::new("op_bit_xor").into()),
@@ -530,10 +329,10 @@ bin_op_def!{
 
     op_bit_and => {
         // Integer
-        (left:Integer,right:Integer) => Ok((*left & *right).into()),
+        (Integer(left),Integer(right)) => Ok((*left & *right).into()),
 
         // Bool
-        (left:Bool   ,right:Bool   ) => Ok((*left & *right).into()),
+        (Bool(left)   ,Bool(right)   ) => Ok((*left & *right).into()),
 
         //default
         (_,_) => Err(UnsupportedOp::new("op_bit_and").into()),
@@ -541,15 +340,15 @@ bin_op_def!{
 
     op_ne => {
         // Integer
-        (left:Integer ,right:Integer) => Ok((*left != *right).into()),
-        (left:Integer ,right:Float  ) => Ok((*left as f64 != *right).into()),
+        (Integer(left) ,Integer(right)) => Ok((*left != *right).into()),
+        (Integer(left) ,Float(right)  ) => Ok((*left as f64 != *right).into()),
 
         // Float
-        (left:Float   ,right:Float  ) => Ok((*left != *right).into()),
-        (left:Float   ,right:Integer) => Ok((*left != *right as Float).into()),
+        (Float(left)   ,Float(right)  ) => Ok((*left != *right).into()),
+        (Float(left)   ,Integer(right)) => Ok((*left != *right as Float).into()),
 
         // Bool
-        (left:Bool    ,right:Bool   ) => Ok((*left != *right).into()),
+        (Bool(left)    ,Bool(right)   ) => Ok((*left != *right).into()),
 
         // default
         (_,_) => Ok((true).into()),
@@ -557,15 +356,15 @@ bin_op_def!{
 
     op_eq => {
         // Integer
-        (left:Integer ,right:Integer) => Ok((*left == *right).into()),
-        (left:Integer ,right:Float  ) => Ok((*left as f64 == *right).into()),
+        (Integer(left) ,Integer(right)) => Ok((*left == *right).into()),
+        (Integer(left) ,Float(right)  ) => Ok((*left as f64 == *right).into()),
 
         // Float
-        (left:Float   ,right:Float  ) => Ok((*left == *right).into()),
-        (left:Float   ,right:Integer) => Ok((*left == *right as Float).into()),
+        (Float(left)   ,Float(right)  ) => Ok((*left == *right).into()),
+        (Float(left)   ,Integer(right)) => Ok((*left == *right as Float).into()),
 
         // Bool
-        (left:Bool    ,right:Bool   ) => Ok((*left == *right).into()),
+        (Bool(left)    ,Bool(right)   ) => Ok((*left == *right).into()),
 
         // default
         (_,_) => Ok((false).into()),
@@ -573,12 +372,12 @@ bin_op_def!{
 
     op_lt => {
         // Integer
-        (left:Integer ,right:Integer) => Ok((*left < *right).into()),
-        (left:Integer ,right:Float  ) => Ok(((*left as Float) < *right).into()),
+        (Integer(left) ,Integer(right)) => Ok((*left < *right).into()),
+        (Integer(left) ,Float(right)  ) => Ok(((*left as Float) < *right).into()),
 
         // Float
-        (left:Float   ,right:Float  ) => Ok((*left < *right).into()),
-        (left:Float   ,right:Integer) => Ok((*left < *right as Float).into()),
+        (Float(left)   ,Float(right)  ) => Ok((*left < *right).into()),
+        (Float(left)   ,Integer(right)) => Ok((*left < *right as Float).into()),
 
         //default
         (_,_) => Err(UnsupportedOp::new("op_lt").into()),
@@ -586,12 +385,12 @@ bin_op_def!{
 
     op_gt => {
         // Integer
-        (left:Integer ,right:Integer) => Ok((*left > *right).into()),
-        (left:Integer ,right:Float  ) => Ok((*left as f64 > *right).into()),
+        (Integer(left) ,Integer(right)) => Ok((*left > *right).into()),
+        (Integer(left) ,Float(right)  ) => Ok((*left as f64 > *right).into()),
 
         // Float
-        (left:Float   ,right:Float  ) => Ok((*left > *right).into()),
-        (left:Float   ,right:Integer) => Ok((*left > *right as Float).into()),
+        (Float(left)   ,Float(right)  ) => Ok((*left > *right).into()),
+        (Float(left)   ,Integer(right)) => Ok((*left > *right as Float).into()),
 
         //default
         (_,_) => Err(UnsupportedOp::new("op_gt").into()),
@@ -599,12 +398,12 @@ bin_op_def!{
 
     op_le => {
         // Integer
-        (left:Integer ,right:Integer) => Ok((*left <= *right).into()),
-        (left:Integer ,right:Float  ) => Ok((*left as f64 <= *right).into()),
+        (Integer(left) ,Integer(right)) => Ok((*left <= *right).into()),
+        (Integer(left) ,Float(right)  ) => Ok((*left as f64 <= *right).into()),
 
         // Float
-        (left:Float   ,right:Float  ) => Ok((*left <= *right).into()),
-        (left:Float   ,right:Integer) => Ok((*left <= *right as Float).into()),
+        (Float(left)   ,Float(right)  ) => Ok((*left <= *right).into()),
+        (Float(left)   ,Integer(right)) => Ok((*left <= *right as Float).into()),
 
         //default
         (_,_) => Err(UnsupportedOp::new("op_le").into()),
@@ -612,12 +411,12 @@ bin_op_def!{
 
     op_ge => {
         // Integer
-        (left:Integer ,right:Integer) => Ok((*left >= *right).into()),
-        (left:Integer ,right:Float  ) => Ok((*left as f64 >= *right).into()),
+        (Integer(left) ,Integer(right)) => Ok((*left >= *right).into()),
+        (Integer(left) ,Float(right)  ) => Ok((*left as f64 >= *right).into()),
 
         // Float
-        (left:Float   ,right:Float  ) => Ok((*left >= *right).into()),
-        (left:Float   ,right:Integer) => Ok((*left >= *right as Float).into()),
+        (Float(left)   ,Float(right)  ) => Ok((*left >= *right).into()),
+        (Float(left)   ,Integer(right)) => Ok((*left >= *right as Float).into()),
 
         //default
         (_,_) => Err(UnsupportedOp::new("op_ge").into()),
@@ -625,7 +424,7 @@ bin_op_def!{
 
     op_l_mov => {
         // Integer
-        (left:Integer ,right:Integer) => Ok((*left << *right).into()),
+        (Integer(left) ,Integer(right)) => Ok((*left << *right).into()),
 
         //default
         (_,_) => Err(UnsupportedOp::new("op_l_mov").into()),
@@ -633,7 +432,7 @@ bin_op_def!{
 
     op_r_mov => {
         // Integer
-        (left:Integer ,right:Integer) => Ok((*left >> *right).into()),
+        (Integer(left) ,Integer(right)) => Ok((*left >> *right).into()),
 
         //default
         (_,_) => Err(UnsupportedOp::new("op_r_mov").into()),
@@ -641,12 +440,12 @@ bin_op_def!{
 
     op_add => {
         // Integer
-        (left:Integer ,right:Integer) => Ok((*left + *right).into()),
-        (left:Integer ,right:Float  ) => Ok(((*left as Float) + *right).into()),
+        (Integer(left) ,Integer(right)) => Ok((*left + *right).into()),
+        (Integer(left) ,Float(right)  ) => Ok(((*left as Float) + *right).into()),
 
         // Float
-        (left:Float   ,right:Integer) => Ok((*left + *right as Float).into()),
-        (left:Float   ,right:Float  ) => Ok((*left + *right).into()),
+        (Float(left)   ,Integer(right)) => Ok((*left + *right as Float).into()),
+        (Float(left)   ,Float(right)  ) => Ok((*left + *right).into()),
 
         //default
         (_,_) => Err(UnsupportedOp::new("op_add").into()),
@@ -654,12 +453,12 @@ bin_op_def!{
 
     op_sub => {
         // Integer
-        (left:Integer ,right:Integer) => Ok((*left - *right).into()),
-        (left:Integer ,right:Float  ) => Ok(((*left as Float) - *right).into()),
+        (Integer(left) ,Integer(right)) => Ok((*left - *right).into()),
+        (Integer(left) ,Float(right)  ) => Ok(((*left as Float) - *right).into()),
 
         // Float
-        (left:Float   ,right:Integer) => Ok((*left - *right as Float).into()),
-        (left:Float   ,right:Float  ) => Ok((*left - *right).into()),
+        (Float(left)   ,Integer(right)) => Ok((*left - *right as Float).into()),
+        (Float(left)   ,Float(right)  ) => Ok((*left - *right).into()),
 
         //default
         (_,_) => Err(UnsupportedOp::new("op_sub").into()),
@@ -667,111 +466,71 @@ bin_op_def!{
 
     op_mul => {
         // Integer
-        (left:Integer,right:Integer) => Ok((*left * *right).into()),
-        (left:Integer,right:Float  ) => Ok(((*left as Float) * *right).into()),
+        (Integer(left),Integer(right)) => Ok((*left * *right).into()),
+        (Integer(left),Float(right)  ) => Ok(((*left as Float) * *right).into()),
         // Float
-        (left:Float,right:Integer  ) => Ok((*left * *right as Float).into()),
-        (left:Float,right:Float    ) => Ok((*left * *right).into()),
+        (Float(left),Integer(right)  ) => Ok((*left * *right as Float).into()),
+        (Float(left),Float(right)    ) => Ok((*left * *right).into()),
 
-        //default
+        // default
         (_,_) => Err(UnsupportedOp::new("op_mul").into()),
     }
 
     op_div => {
         // Integer
-        (left:Integer,right:Integer) => Ok((*left / *right).into()),
-        (left:Integer,right:Float  ) => Ok(((*left as Float) / *right).into()),
+        (Integer(left),Integer(right)) => Ok((*left / *right).into()),
+        (Integer(left),Float(right)  ) => Ok(((*left as Float) / *right).into()),
         // Float
-        (left:Float,right:Integer  ) => Ok((*left / *right as Float).into()),
-        (left:Float,right:Float    ) => Ok((*left / *right).into()),
+        (Float(left),Integer(right)  ) => Ok((*left / *right as Float).into()),
+        (Float(left),Float(right)    ) => Ok((*left / *right).into()),
 
-        //default
+        // default
         (_,_) => Err(UnsupportedOp::new("op_div").into()),
     }
 
     op_mod => {
         // Integer
-        (left:Integer,right:Integer) => Ok((*left % *right).into()),
+        (Integer(left),Integer(right)) => Ok((*left % *right).into()),
 
-        //default
+        // default
         (_,_) => Err(UnsupportedOp::new("op_mod").into()),
     }
 
     op_fact => {
         // Integer
-        (left:Integer,right:Integer) => Ok((*left % *right).into()),
+        (Integer(left),Integer(right)) => Ok((*left % *right).into()),
 
-        //default
+        // default
         (_,_) => Err(UnsupportedOp::new("op_fact").into()),
     }
 }
-
-mut_bin_op_def!{
-    mut op_assign => {
+def_mut_bin_op!{
+    op_assign => {
+        (RefMutValue::Integer(left),RefConstValue::Integer(right)) => {*left = *right;Ok((*left).into())},
+        (RefMutValue::Float(left)  ,RefConstValue::Float(right)  ) => {*left = *right;Ok((*left).into())},
+        (RefMutValue::Bool(left)   ,RefConstValue::Bool(right)   ) => {*left = *right;Ok((*left).into())},
         (_,_) => Err(UnsupportedOp::new("op_assign").into()),
     }
 }
 
 def_unary_op!{
     op_bit_not => {
-        (left:Integer) => Ok((!left).into()),
-        (left:Bool   ) => Ok((!left).into()),
+        (Integer(left)) => Ok((!left).into()),
+        (Bool(left)   ) => Ok((!left).into()),
         (_) => Err(UnsupportedOp::new("op_bit_not").into()),
     }
     op_not => {
-        (left:Bool   ) => Ok((!left).into()),
+        (Bool(left)   ) => Ok((!left).into()),
         (_) => Err(UnsupportedOp::new("op_not").into()),
     }
     op_neg => {
-        (left:Integer) => Ok((-left).into()),
-        (left:Float  ) => Ok((-left).into()),
+        (Integer(left)) => Ok((-left).into()),
+        (Float(left)  ) => Ok((-left).into()),
         (_) => Err(UnsupportedOp::new("op_neg").into()),
     }
     op_pos => {
-        (left:Integer) => Ok((*left).into()),
-        (left:Float  ) => Ok((*left).into()),
+        (Integer(left)) => Ok((*left).into()),
+        (Float(left)  ) => Ok((*left).into()),
         (_) => Err(UnsupportedOp::new("op_pos").into()),
     }
 }
-
-
-#[test]
-fn test(){
-    let a = RegType::InlineInteger(InlineInteger(1));
-    let b = RegType::InlineInteger(InlineInteger(1));
-
-    let c = RegType::InlineFloat(InlineFloat(1.0));
-    let res = op_bit_or(&a,&b).unwrap().load_variable(true);
-    println!("1+1={:?}",op_bit_or(&a,&b));
-
-
-}
-
-// impl_default!(
-//     OpOr    => {unimplemented!()},
-//     OpAnd   => {unimplemented!()},
-//     OpBitOr => {unimplemented!()},
-//     OpBitXor=> {unimplemented!()},
-//     OpBitAnd=> {unimplemented!()},
-//     OpNe    => {unimplemented!()},
-//     OpEq    => {unimplemented!()},
-//     OpLt    => {unimplemented!()},
-//     OpGt    => {unimplemented!()},
-//     OpLe    => {unimplemented!()},
-//     OpGe    => {unimplemented!()},
-//     OpLMov  => {unimplemented!()},
-//     OpRMov  => {unimplemented!()},
-//     OpAdd   => {unimplemented!()},
-//     OpSub   => {unimplemented!()},
-//     OpMul   => {unimplemented!()},
-//     OpDiv   => {unimplemented!()},
-//     OpMod   => {unimplemented!()},
-//     OpFact  => {unimplemented!()},
-//     OpAssign=> {unimplemented!()},
-//
-//     //unary_ops:
-//     OpBitNot=> {unimplemented!()},
-//     OpNot   => {unimplemented!()},
-//     OpNeg   => {unimplemented!()},
-//     OpPos   => {unimplemented!()}
-// );
