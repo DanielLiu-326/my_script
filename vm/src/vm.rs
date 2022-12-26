@@ -143,10 +143,20 @@ impl VM{
                 self.pc += pos as usize;
             }
             OpCode::Chk(a)  => {
+                if *self.stack
+                    .register(a)
+                    .unbox_const()
+                    .try_as_bool()?
+                {
+                    self.pc += 1;
+                }else{
+                    self.pc += 2;
+                }
+            }
+            OpCode::Call(a) => {
 
             }
-            OpCode::Call(_) => {unimplemented!()}
-            OpCode::CallConst0(_) => {unimplemented!()}
+            OpCode::CallConst0(b) => {unimplemented!()}
             OpCode::Ret => {unimplemented!()}
 
             OpCode::LoadAsMutRef(a, addr) => {

@@ -47,12 +47,25 @@ impl Debug for DerefNull {
 }
 
 
+pub struct TypeError(&'static str,&'static str);
+impl Debug for TypeError{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f,"expect {} ,found {}",self.1,self.0)
+    }
+}
+impl TypeError{
+    pub fn new(expect:&'static str,found:&'static str)->Self{
+        Self(expect,found)
+    }
+}
+
 #[mux]
 #[derive(Debug)]
 pub enum Error{
     MutabilityError(MutabilityError),
     UnsupportedOp(UnsupportedOp),
-    DerefNull(DerefNull)
+    DerefNull(DerefNull),
+    TypeError(TypeError),
 }
 
 pub(crate) type Result<T> = std::result::Result<T,Error>;

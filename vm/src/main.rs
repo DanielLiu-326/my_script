@@ -67,12 +67,12 @@ use crate::vm::VM;
 
 mod opcode;
 mod errors;
-mod types;
 mod mem_collection;
 mod util;
 mod vm;
 mod stack;
 mod const_table;
+mod types;
 
 
 use crate::types::Value;
