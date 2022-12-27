@@ -7,11 +7,13 @@ use crate::util::UncheckMut;
 
 pub mod integer;
 pub mod float;
-mod bool;
+pub mod bool;
+pub mod nil;
 
-use integer::*;
-use float::*;
-use bool::*;
+pub use integer::*;
+pub use float::*;
+pub use self::bool::*;
+pub use nil::*;
 
 // ***************** operation defines *****************
 
@@ -108,7 +110,7 @@ impl<'a> RefConstValue<'a>{
     #[inline(always)]
     pub fn try_into_bool(&self)->Result<&bool>{
         match self{
-            Bool(ret) => {
+            RefConstValue::Bool(ret) => {
                 Ok(ret)
             },
             _ => {
@@ -167,7 +169,7 @@ impl RegType{
     }
 }
 
-
+#[macro_export]
 macro_rules! call_op {
     ($op_name:literal,$left:expr,$right:expr) => {
         match_ref_const_val!(($left).unbox_const(),left,{
@@ -182,6 +184,7 @@ macro_rules! call_op {
     };
 }
 
+#[macro_export]
 macro_rules! call_mut_op {
     ($op_name:literal,$left:expr,$right:expr) => {
         match_ref_mut_val!(($left).unbox_mut()?,left,{
@@ -194,4 +197,8 @@ macro_rules! call_mut_op {
             UnaryMutOp::<$op_name>::op_call(val,$right)
         })
     };
+}
+#[inline(always)]
+pub fn call_op<const op_name:&'static str>(){
+
 }

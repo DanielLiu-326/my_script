@@ -1,4 +1,5 @@
 use std::ops::{Deref, DerefMut};
+use crate::call_op;
 use crate::const_table::ConstTable;
 use crate::opcode::OpCode;
 use crate::stack::VmStack;
@@ -31,7 +32,7 @@ impl VM{
     pub fn execute_code(&mut self,op:OpCode)->Result<()>{
         match op {
             OpCode::Or(a, b, c) => {
-                *self.register_mut(a) = op_or(self.register(b), self.register(c))?.load_variable(true);
+                *self.register_mut(a) = call_op!("op_or",self.register(b), self.register(c))?.load_variable(true);
                 self.pc+=1;
             }
             OpCode::And(a, b, c) => {

@@ -3,6 +3,8 @@ use crate::errors::*;
 use crate::types::{BinaryMutOp, BinaryOp, UnaryOp};
 use crate::util::UncheckMut;
 use super::Val;
+use super::RefConstValue;
+use super::*;
 
 pub type Float = f64;
 
@@ -112,7 +114,7 @@ impl BinaryOp<"op_r_mov"> for Float{
 impl BinaryOp<"op_add"> for Float{
     fn op_call(&self, other: &RegType) -> Result<Value> {
         match other.unbox_const(){
-            RefConstValue::Integer(right) => Ok(Value::(*self + *right)),
+            RefConstValue::Integer(right) => Ok(Value::Integer(*self + *right)),
             RefConstValue::Float  (right) => Ok(Value::Float(*self as Float + *right)),
             _ => Result::Err(UnsupportedOp::new("op_add").into())
         }
