@@ -16,7 +16,7 @@ impl BinaryOp<"op_or"> for Integer {
         let left = *self != 0;
         match other.unbox_const(){
             RefConstValue::Bool   (right) => Ok(Value::Bool(left||*right)),
-            RefConstValue::Integer(right) => Ok(Value::Bool(left||*right)),
+            RefConstValue::Integer(right) => Ok(Value::Bool(left||(*right!=0))),
             _ => Result::Err(UnsupportedOp::new("op_or").into())
         }
     }
@@ -27,7 +27,7 @@ impl BinaryOp<"op_and"> for Integer{
         let left = *self != 0;
         match other.unbox_const(){
             RefConstValue::Bool   (right) => Ok(Value::Bool(left&&*right)),
-            RefConstValue::Integer(right) => Ok(Value::Bool(left&&*right)),
+            RefConstValue::Integer(right) => Ok(Value::Bool(left&&(*right!=0))),
             _ => Result::Err(UnsupportedOp::new("op_and").into())
         }
     }
@@ -36,7 +36,7 @@ impl BinaryOp<"op_and"> for Integer{
 impl BinaryOp<"op_bit_or"> for Integer{
     fn op_call(&self, other: &RegType) -> Result<Value> {
         match other.unbox_const(){
-            RefConstValue::Integer(right) => Ok(Value::Bool(*self | *right)),
+            RefConstValue::Integer(right) => Ok(Value::Integer(*self | *right)),
             _ => Result::Err(UnsupportedOp::new("op_bit_or").into())
         }
     }
@@ -237,6 +237,18 @@ pub struct InlineInteger<const MUTABLE:bool>(UncheckMut<Integer>);
 impl<const MUTABLE:bool> InlineInteger<MUTABLE> {
     pub fn new(val:Integer)->Self{
         Self(UncheckMut::new(val))
+    }
+}
+impl<const MUTABLE:bool> RegTy for InlineInteger<MUTABLE>{
+    fn unbox_const(&self) -> RefConstValue {
+        self.0.get().into()
+    }
+    fn unbox_mut(&self) -> Result<RefMutValue> {
+        if MUTABLE {
+            Ok(self.0.get_mut().into())
+        }else{
+            Err(MutabilityError::new().into())
+        }
     }
 }
 

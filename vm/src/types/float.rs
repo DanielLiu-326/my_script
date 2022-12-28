@@ -114,7 +114,7 @@ impl BinaryOp<"op_r_mov"> for Float{
 impl BinaryOp<"op_add"> for Float{
     fn op_call(&self, other: &RegType) -> Result<Value> {
         match other.unbox_const(){
-            RefConstValue::Integer(right) => Ok(Value::Integer(*self + *right)),
+            RefConstValue::Integer(right) => Ok(Value::Float(*self + (*right as Float))),
             RefConstValue::Float  (right) => Ok(Value::Float(*self as Float + *right)),
             _ => Result::Err(UnsupportedOp::new("op_add").into())
         }
@@ -124,7 +124,7 @@ impl BinaryOp<"op_add"> for Float{
 impl BinaryOp<"op_sub"> for Float{
     fn op_call(&self, other: &RegType) -> Result<Value> {
         match other.unbox_const(){
-            RefConstValue::Integer(right) => Ok(Value::Integer(*self - (*right  as Float))),
+            RefConstValue::Integer(right) => Ok(Value::Float(*self - (*right  as Float))),
             RefConstValue::Float  (right) => Ok(Value::Float(*self - *right)),
             _ => Result::Err(UnsupportedOp::new("op_sub").into())
         }
@@ -134,7 +134,7 @@ impl BinaryOp<"op_sub"> for Float{
 impl BinaryOp<"op_mul"> for Float{
     fn op_call(&self, other: &RegType) -> Result<Value> {
         match other.unbox_const(){
-            RefConstValue::Integer(right) => Ok(Value::Integer(*self * (*right as Float))),
+            RefConstValue::Integer(right) => Ok(Value::Float(*self * (*right as Float))),
             RefConstValue::Float  (right) => Ok(Value::Float(*self * *right)),
             _ => Result::Err(UnsupportedOp::new("op_mul").into())
         }
@@ -144,7 +144,7 @@ impl BinaryOp<"op_mul"> for Float{
 impl BinaryOp<"op_div"> for Float{
     fn op_call(&self, other: &RegType) -> Result<Value> {
         match other.unbox_const(){
-            RefConstValue::Integer(right) => Ok(Value::Integer(*self / (*right as Float))),
+            RefConstValue::Integer(right) => Ok(Value::Float(*self / (*right as Float))),
             RefConstValue::Float  (right) => Ok(Value::Float(*self / *right)),
             _ => Result::Err(UnsupportedOp::new("op_div").into())
         }
@@ -205,6 +205,18 @@ pub struct InlineFloat<const MUTABLE:bool>(UncheckMut<Float>);
 impl<const MUTABLE:bool> InlineFloat<MUTABLE> {
     pub fn new(val:Float)->Self{
         Self(UncheckMut::new(val))
+    }
+}
+impl<const MUTABLE:bool> RegTy for InlineFloat<MUTABLE>{
+    fn unbox_const(&self) -> RefConstValue {
+        self.0.get().into()
+    }
+    fn unbox_mut(&self) -> Result<RefMutValue> {
+        if MUTABLE{
+            Ok(self.0.get_mut().into())
+        }else{
+            Err(MutabilityError::new().into())
+        }
     }
 }
 

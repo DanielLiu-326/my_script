@@ -1,5 +1,4 @@
 use std::ops::{Deref, DerefMut};
-use crate::call_op;
 use crate::const_table::ConstTable;
 use crate::opcode::OpCode;
 use crate::stack::VmStack;
@@ -32,97 +31,97 @@ impl VM{
     pub fn execute_code(&mut self,op:OpCode)->Result<()>{
         match op {
             OpCode::Or(a, b, c) => {
-                *self.register_mut(a) = call_op!("op_or",self.register(b), self.register(c))?.load_variable(true);
+                *self.register_mut(a) = call_bin::<"op_or">(self.register(b), self.register(c))?.load_variable(true);
                 self.pc+=1;
             }
             OpCode::And(a, b, c) => {
-                *self.register_mut(a) = op_and(self.register(b),self.register(c))?.load_variable(true);
+                *self.register_mut(a) = call_bin::<"op_and">(self.register(b),self.register(c))?.load_variable(true);
                 self.pc+=1;
             }
             OpCode::BitOr(a, b, c) => {
-                *self.register_mut(a) = op_bit_or(self.register(b),self.register(c))?.load_variable(true);
+                *self.register_mut(a) = call_bin::<"op_bit_or">(self.register(b),self.register(c))?.load_variable(true);
                 self.pc+=1;
             }
             OpCode::BitXor(a, b, c) => {
-                *self.register_mut(a) = op_bit_xor(self.register(b),self.register(c))?.load_variable(true);
+                *self.register_mut(a) = call_bin::<"op_bit_xor">(self.register(b),self.register(c))?.load_variable(true);
                 self.pc+=1;
             }
             OpCode::BitAnd(a, b, c) => {
-                *self.register_mut(a) = op_bit_and(self.register(b),self.register(c))?.load_variable(true);
+                *self.register_mut(a) = call_bin::<"op_bit_and">(self.register(b),self.register(c))?.load_variable(true);
                 self.pc+=1;
             }
             OpCode::NE(a, b, c) => {
-                *self.register_mut(a) = op_ne(self.register(b),self.register(c))?.load_variable(true);
+                *self.register_mut(a) = call_bin::<"op_ne">(self.register(b),self.register(c))?.load_variable(true);
                 self.pc+=1;
             }
             OpCode::EQ(a, b, c) => {
-                *self.register_mut(a) = op_eq(self.register(b),self.register(c))?.load_variable(true);
+                *self.register_mut(a) = call_bin::<"op_eq">(self.register(b),self.register(c))?.load_variable(true);
                 self.pc+=1;
             }
             OpCode::RefEQ(a, b, c) => { unimplemented!() }
             OpCode::RefNE(_, _, _) => {unimplemented!()}
             OpCode::LT(a, b, c) => {
-                *self.register_mut(a) = op_lt(self.register(b),self.register(c))?.load_variable(true);
+                *self.register_mut(a) = call_bin::<"op_lt">(self.register(b),self.register(c))?.load_variable(true);
                 self.pc+=1;
             }
             OpCode::GT(a, b, c) => {
-                *self.register_mut(a) = op_gt(self.register(b),self.register(c))?.load_variable(true);
+                *self.register_mut(a) = call_bin::<"op_gt">(self.register(b),self.register(c))?.load_variable(true);
                 self.pc+=1;
             }
             OpCode::LE(a, b, c) => {
-                *self.register_mut(a) = op_le(self.register(b),self.register(c))?.load_variable(true);
+                *self.register_mut(a) = call_bin::<"op_le">(self.register(b),self.register(c))?.load_variable(true);
                 self.pc+=1;
             }
             OpCode::GE(a, b, c) => {
-                *self.register_mut(a) = op_le(self.register(b),self.register(c))?.load_variable(true);
+                *self.register_mut(a) = call_bin::<"op_le">(self.register(b),self.register(c))?.load_variable(true);
                 self.pc+=1;
             }
             OpCode::LMov(a , b, c) => {
-                *self.register_mut(a) = op_l_mov(self.register(b),self.register(c))?.load_variable(true);
+                *self.register_mut(a) = call_bin::<"op_l_mov">(self.register(b),self.register(c))?.load_variable(true);
                 self.pc+=1;
             }
             OpCode::RMov(a, b, c) => {
-                *self.register_mut(a) = op_r_mov(self.register(b),self.register(c))?.load_variable(true);
+                *self.register_mut(a) = call_bin::<"op_r_mov">(self.register(b),self.register(c))?.load_variable(true);
                 self.pc+=1;
             }
             OpCode::Add(a, b, c) => {
-                *self.register_mut(a) = op_and(self.register(b),self.register(c))?.load_variable(true);
+                *self.register_mut(a) = call_bin::<"op_and">(self.register(b),self.register(c))?.load_variable(true);
                 self.pc+=1;
             }
             OpCode::Sub(a, b, c) => {
-                *self.register_mut(a) = op_and(self.register(b),self.register(c))?.load_variable(true);
+                *self.register_mut(a) = call_bin::<"op_and">(self.register(b),self.register(c))?.load_variable(true);
                 self.pc+=1;
             }
             OpCode::Mul(a, b, c) => {
-                *self.register_mut(a) = op_mul(self.register(b),self.register(c))?.load_variable(true);
+                *self.register_mut(a) = call_bin::<"op_mul">(self.register(b),self.register(c))?.load_variable(true);
                 self.pc+=1;
             }
             OpCode::Div(a, b, c) => {
-                *self.register_mut(a) = op_div(self.register(b),self.register(c))?.load_variable(true);
+                *self.register_mut(a) = call_bin::<"op_div">(self.register(b),self.register(c))?.load_variable(true);
                 self.pc+=1;
             }
             OpCode::Mod(a, b, c) => {
-                *self.register_mut(a) = op_mod(self.register(b),self.register(c))?.load_variable(true);
+                *self.register_mut(a) = call_bin::<"op_mod">(self.register(b),self.register(c))?.load_variable(true);
                 self.pc+=1;
             }
             OpCode::Fact(a, b, c) => {
-                *self.register_mut(a) = op_fact(self.register(b),self.register(c))?.load_variable(true);
+                *self.register_mut(a) = call_bin::<"op_fact">(self.register(b),self.register(c))?.load_variable(true);
                 self.pc+=1;
             }
             OpCode::BitNot(a, b) => {
-                *self.register_mut(a) = op_bit_not(self.register(b))?.load_variable(true);
+                *self.register_mut(a) = call_unary::<"op_bit_not">(self.register(b))?.load_variable(true);
                 self.pc+=1;
             }
             OpCode::Not(a, b) => {
-                *self.register_mut(a) = op_not(self.register(b))?.load_variable(true);
+                *self.register_mut(a) = call_unary::<"op_not">(self.register(b))?.load_variable(true);
                 self.pc+=1;
             }
             OpCode::Neg(a, b) => {
-                *self.register_mut(a) = op_neg(self.register(b))?.load_variable(true);
+                *self.register_mut(a) = call_unary::<"op_neg">(self.register(b))?.load_variable(true);
                 self.pc+=1;
             }
             OpCode::Pos(a, b) => {
-                *self.register_mut(a) = op_pos(self.register(b))?.load_variable(true);
+                *self.register_mut(a) = call_unary::<"op_pos">(self.register(b))?.load_variable(true);
                 self.pc+=1;
             }
             // OpCode::ArrayVisit(_, _, _) => {unimplemented!()}
@@ -147,7 +146,7 @@ impl VM{
                 if *self.stack
                     .register(a)
                     .unbox_const()
-                    .try_as_bool()?
+                    .try_into_bool()?
                 {
                     self.pc += 1;
                 }else{

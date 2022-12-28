@@ -6,7 +6,7 @@ use super::float::*;
 use super::*;
 use crate::Value::Bool;
 
-
+#[derive(Debug)]
 pub struct Nil;
 
 impl BinaryOp<"op_or"> for Nil {}
