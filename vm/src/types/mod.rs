@@ -17,24 +17,24 @@ pub use nil::*;
 
 // ***************** operation defines *****************
 
-pub trait BinaryOp<const op_name:&'static str>{
+pub trait BinaryOp<const OP_NAME:&'static str>{
     #[inline(always)]
     fn op_call(&self,other:&RegType) ->Result<Value>{
-        Err(UnsupportedOp::new(op_name).into())
+        Err(UnsupportedOp::new(OP_NAME).into())
     }
 }
 
-pub trait BinaryMutOp<const op_name:&'static str>{
+pub trait BinaryMutOp<const OP_NAME:&'static str>{
     #[inline(always)]
     fn op_call(&mut self,other:&RegType) ->Result<Value>{
-        Err(UnsupportedOp::new(op_name).into())
+        Err(UnsupportedOp::new(OP_NAME).into())
     }
 }
 
-pub trait UnaryOp<const op_name:&'static str>{
+pub trait UnaryOp<const OP_NAME:&'static str>{
     #[inline(always)]
     fn op_call(&self) ->Result<Value>{
-        Err(UnsupportedOp::new(op_name).into())
+        Err(UnsupportedOp::new(OP_NAME).into())
     }
 }
 
@@ -169,30 +169,43 @@ impl RegType{
     }
 }
 
-#[inline(always)]
-pub fn call_bin<const OP_NAME:&'static str>(left:&RegType,right:&RegType) -> Result<Value> {
-    ref_const_value_match!(left.unbox_const(),left,{
-        UnaryOp::<OP_NAME>::op_call(left,right)
+// #[inline(always)]
+// pub fn call_bin<const OP_NAME:&'static str>(left:&RegType,right:&RegType) -> Result<Value> {
+//     ref_const_value_match!(left.unbox_const(),left,{
+//         BinaryOp::<OP_NAME>::op_call(left,right)
+//     })
+// }
+//
+// #[inline(always)]
+// pub fn call_unary<const OP_NAME:&'static str>(val:&RegType) -> Result<Value> {
+//     ref_const_value_match!(val.unbox_const(),val,{
+//         UnaryOp::<OP_NAME>::op_call(val)
+//     })
+// }
+//
+// #[inline(always)]
+// pub fn call_mut_bin<const OP_NAME:&'static str>(val:&RegType) -> Result<Value> {
+//     ref_mut_value_match!(val.unbox_mut()?,val,{
+//         UnaryOp::<OP_NAME>::op_call(val)
+//     })
+// }
+//
+// #[inline(always)]
+// pub fn call_mut_unary<const OP_NAME:&'static str>(left:&RegType,right:&RegType) -> Result<Value>{
+//     ref_mut_value_match!(left.unbox_mut()?,left,{
+//         UnaryOp::<OP_NAME>::op_call(left,right)
+//     })
+// }
+
+
+pub(crate) macro call_bin($op_name:literal,$left:expr,$right:expr) {
+    ref_const_value_match!(($left).unbox_const(),left,{
+        BinaryOp::<$op_name>::op_call(left,$right)
     })
 }
 
-#[inline(always)]
-pub fn call_unary<const OP_NAME:&'static str>(val:&RegType) -> Result<Value> {
-    ref_const_value_match!(val.unbox_const(),val,{
-        UnaryOp::<OP_NAME>::op_call(val)
-    })
-}
-
-#[inline(always)]
-pub fn call_mut_bin<const OP_NAME:&'static str>(val:&RegType) -> Result<Value> {
-    ref_mut_value_match!(val.unbox_mut()?,val,{
-        UnaryOp::<OP_NAME>::op_call(val)
-    })
-}
-
-#[inline(always)]
-pub fn call_mut_unary<const OP_NAME:&'static str>(left:&RegType,right:&RegType) -> Result<Value>{
-    ref_mut_value_match!(left.unbox_mut()?,left,{
-        UnaryOp::<OP_NAME>::op_call(left,right)
+pub(crate) macro call_unary($op_name:literal,$value:expr) {
+    ref_const_value_match!(($value).unbox_const(),value,{
+        UnaryOp::<$op_name>::op_call(value)
     })
 }

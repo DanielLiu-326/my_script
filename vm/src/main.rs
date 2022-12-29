@@ -1,6 +1,7 @@
 #![feature(unboxed_closures,fn_traits,ptr_metadata,auto_traits,negative_impls)]
 #![feature(specialization)]
 #![feature(adt_const_params)]
+#![feature(decl_macro)]
 //
 use crate::opcode::OpCode;
 use crate::stack::VmStack;

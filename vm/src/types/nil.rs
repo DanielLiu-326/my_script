@@ -66,6 +66,21 @@ impl<const MUTABLE:bool> RefNil<MUTABLE> {
     }
 }
 
+impl<const MUTABLE:bool> RegTy for RefNil<MUTABLE>{
+    #[inline(always)]
+    fn unbox_const(&self) -> RefConstValue {
+        self.0.get().into()
+    }
+    #[inline(always)]
+    fn unbox_mut(&self) -> Result<RefMutValue> {
+        if MUTABLE{
+            Ok(self.0.get_mut().into())
+        } else {
+            Err(MutabilityError::new().into())
+        }
+    }
+}
+
 impl Val for Nil{
     fn load_variable(&self, mutable: bool) -> RegType {
         if mutable{

@@ -34,28 +34,24 @@ pub fn mux(_attr:TokenStream,mut input:TokenStream) -> TokenStream{
     let mut output:proc_macro2::TokenStream = input.into();
 
     output.extend(quote!(
-        macro_rules! #macro_name {
-            ($input:expr,$var:ident,$output:expr) => {paste!{{
-                use #enum_ty :: *;
-                match $input{
-                    #(#vars ($var) => {
-                        $output
-                    })*
-                }
-            }}};
-        }
+        pub(crate) macro #macro_name($input:expr,$var:ident,$output:expr){{
+            use #enum_ty :: *;
+            match $input{
+                #(#vars ($var) => {
+                    $output
+                })*
+            }
+        }}
     ));
 
-    output.extend(var_map.iter().map(|(ty,var)|{
-        quote!(
-            impl #enum_generics From<#ty> for #enum_ty #enum_generics{
-                #[inline(always)]
-                fn from(val:#ty) -> Self {
-                    Self::#var(val)
-                }
+    output.extend(var_map.iter().map(|(ty,var)|{ quote!(
+        impl #enum_generics From<#ty> for #enum_ty #enum_generics{
+            #[inline(always)]
+            fn from(val:#ty) -> Self {
+                Self::#var(val)
             }
-        )
-    }).fold(quote!(),|mut input,now|{
+        }
+    )}).fold(quote!(),|mut input,now|{
         input.extend(now);
         input
     }));
