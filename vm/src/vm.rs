@@ -1,3 +1,4 @@
+use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
 use crate::const_table::ConstTable;
 use crate::opcode::OpCode;
@@ -5,12 +6,23 @@ use crate::stack::VmStack;
 use crate::types::*;
 
 use crate::errors::*;
-
 pub struct VM {
     stack:VmStack,
     pc:usize,
     op_codes:Vec<OpCode>,
     const_table:ConstTable,
+}
+impl Debug for VM{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(f,
+r#"VM:
+----stack print----
+{:?}
+----program counter----
+{}
+"#
+        ,self.stack,self.pc)
+    }
 }
 
 impl VM{
@@ -23,12 +35,17 @@ impl VM{
         }
     }
 
+    #[inline(always)]
     pub fn register(&self, reg:u8) -> &RegType{
         self.stack.register(reg)
     }
+
+    #[inline(always)]
     pub fn register_mut(&mut self, reg:u8) -> &mut RegType{
         self.stack.register_mut(reg)
     }
+
+    #[inline(always)]
     pub fn execute_code(&mut self,op:OpCode)->Result<()>{
         match op {
             OpCode::Or(a, b, c) => {
@@ -86,7 +103,7 @@ impl VM{
                 self.pc+=1;
             }
             OpCode::Add(a, b, c) => {
-                *self.register_mut(a) = call_bin!("op_and",self.register(b),self.register(c))?.load_variable(true);
+                *self.register_mut(a) = call_bin!("op_add",self.register(b),self.register(c))?.load_variable(true);
                 self.pc+=1;
             }
             OpCode::Sub(a, b, c) => {
@@ -136,11 +153,11 @@ impl VM{
                 self.pc+=1;
             }
             OpCode::JmpPrev(a,b,c)  => {
-                let pos = OpCode::JmpPrev(a,b,c).get_u24();
+                let pos = u32::from_le_bytes([c,b,a,0]);
                 self.pc -= pos as usize;
             }
             OpCode::JmpPost(a,b,c)  => {
-                let pos = OpCode::JmpPost(a,b,c).get_u24();
+                let pos = u32::from_le_bytes([c,b,a,0]);
                 self.pc += pos as usize;
             }
             OpCode::Chk(a)  => {
@@ -157,7 +174,7 @@ impl VM{
             OpCode::Call(a) => {
 
             }
-            OpCode::CallConst0(b) => {unimplemented!()}
+            // OpCode::CallConst0(b) => {unimplemented!()}
             OpCode::Ret => {unimplemented!()}
 
             OpCode::LoadAsMutRef(a, addr) => {
@@ -175,7 +192,7 @@ impl VM{
     pub fn run(&mut self){
         loop {
             self.execute_code(self.op_codes[self.pc]).unwrap();
-            println!("{:?}",self.stack)
+            //println!("{:?}",self)
         }
     }
 

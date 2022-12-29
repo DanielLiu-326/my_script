@@ -21,14 +21,14 @@ impl Default for VmStack{
 
 impl VmStack{
     #[inline(always)]
-    pub fn register(&self, reg:u8) -> & RegType{
-        &self.stack[self.bs+reg as usize]
-    }
+    pub fn register(&self, reg:u8) -> & RegType{unsafe{
+        self.stack.get_unchecked(self.bs+reg as usize)
+    }}
 
     #[inline(always)]
-    pub fn register_mut(&mut self, reg:u8) -> &mut RegType{
-        &mut self.stack[self.bs+reg as usize]
-    }
+    pub fn register_mut(&mut self, reg:u8) -> &mut RegType{unsafe{
+        self.stack.get_unchecked_mut(self.bs + reg as usize)
+    }}
 
     #[inline(always)]
     pub fn push_frame(&mut self, frame_size:u8){
@@ -44,7 +44,7 @@ impl VmStack{
 impl Debug for VmStack{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {unsafe{
         writeln!(f,"Stack Dbg:")?;
-        for x in 0..(self.bs + 256){
+        for x in 0..(self.bs + 10){
             writeln!(f,"{:?}",self.stack[x].unbox_const())?
         }
         writeln!(f,"----------------------------")

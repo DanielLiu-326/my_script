@@ -61,6 +61,7 @@ impl UnaryOp<"op_pos"> for Nil {}
 pub struct RefNil<const MUTABLE:bool>(UncheckMut<Nil>);
 
 impl<const MUTABLE:bool> RefNil<MUTABLE> {
+    #[inline(always)]
     pub fn new()->Self{
         Self(UncheckMut::new(Nil))
     }
@@ -82,6 +83,7 @@ impl<const MUTABLE:bool> RegTy for RefNil<MUTABLE>{
 }
 
 impl Val for Nil{
+    #[inline(always)]
     fn load_variable(&self, mutable: bool) -> RegType {
         if mutable{
             RegType::RefNil(RefNil::new())

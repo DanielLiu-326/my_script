@@ -83,17 +83,19 @@ fn main() {
     let mut const_table = Vec::new();
     let mut op_codes = Vec::new();
 
-    //opcodes
-    op_codes.push(OpCode::LoadAsConstRef(0,0));
-    op_codes.push(OpCode::LoadAsConstRef(1,1));
+    op_codes.push(OpCode::LoadAsMutRef(1,0));
+    op_codes.push(OpCode::LoadAsConstRef(2,1));
+    op_codes.push(OpCode::LoadAsConstRef(3,2));
 
-    op_codes.push(OpCode::And(2,0,1));
-    op_codes.push(OpCode::Or(3,0,1));
-    op_codes.push(OpCode::BitAnd(4,0,0));
+    op_codes.push(OpCode::EQ(0,2,1));
+    op_codes.push(OpCode::Chk(0));
+    op_codes.push(OpCode::JmpPost(0,0,3));
+    op_codes.push(OpCode::Add(1,1,3));
+    op_codes.push(OpCode::JmpPrev(0,0,4));
 
-    //consts
-    const_table.push(Value::Bool(false));
-    const_table.push(Value::Bool(true));
+    const_table.push(Value::Integer(0));
+    const_table.push(Value::Integer(1_000_000_000));
+    const_table.push(Value::Integer(1));
 
     let mut vm = VM::new(op_codes,const_table);
     vm.run();

@@ -99,7 +99,7 @@ pub enum OpCode {
     /// - 压入基地址寄存器
     /// - 将基地址设置为栈顶-4
     Call(u8),
-    CallConst0(ConstAddr),      //调用Const函数
+    // CallConst0(ConstAddr),      //调用Const函数
 
     Ret,                        //弹出到基地址寄存器，弹出到程序计数
 

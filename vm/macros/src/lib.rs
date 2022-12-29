@@ -7,7 +7,7 @@ use proc_macro2::Span;
 use syn::ItemEnum;
 use syn::spanned::Spanned;
 
-use quote::{quote, TokenStreamExt, ToTokens};
+use quote::{quote, TokenStreamExt};
 
 #[proc_macro_attribute]
 pub fn mux(_attr:TokenStream,mut input:TokenStream) -> TokenStream{

@@ -18,6 +18,7 @@ impl BinaryOp<"op_or"> for Bool {
 }
 
 impl BinaryOp<"op_and"> for Bool{
+    #[inline(always)]
     fn op_call(&self, other: &RegType) -> Result<Value> {
         match other.unbox_const(){
             RefConstValue::Bool   (right) => Ok(Value::Bool(*self && *right)),
@@ -28,6 +29,7 @@ impl BinaryOp<"op_and"> for Bool{
 }
 
 impl BinaryOp<"op_bit_or"> for Bool{
+    #[inline(always)]
     fn op_call(&self, other: &RegType) -> Result<Value> {
         match other.unbox_const(){
             RefConstValue::Bool(right) => Ok(Value::Bool(*self | *right)),
@@ -37,6 +39,7 @@ impl BinaryOp<"op_bit_or"> for Bool{
 }
 
 impl BinaryOp<"op_bit_xor"> for Bool{
+    #[inline(always)]
     fn op_call(&self, other: &RegType) -> Result<Value> {
         match other.unbox_const(){
             RefConstValue::Bool(right) => Ok(Value::Bool(*self ^ *right)),
@@ -46,6 +49,7 @@ impl BinaryOp<"op_bit_xor"> for Bool{
 }
 
 impl BinaryOp<"op_bit_and"> for Bool{
+    #[inline(always)]
     fn op_call(&self, other: &RegType) -> Result<Value> {
         match other.unbox_const(){
             RefConstValue::Bool(right) => Ok(Value::Bool(*self & *right)),
@@ -55,6 +59,7 @@ impl BinaryOp<"op_bit_and"> for Bool{
 }
 
 impl BinaryOp<"op_ne"> for Bool{
+    #[inline(always)]
     fn op_call(&self, other: &RegType) -> Result<Value> {
         match other.unbox_const(){
             RefConstValue::Bool(right) => Ok(Value::Bool(*self != *right)),
@@ -64,6 +69,7 @@ impl BinaryOp<"op_ne"> for Bool{
 }
 
 impl BinaryOp<"op_eq"> for Bool{
+    #[inline(always)]
     fn op_call(&self, other: &RegType) -> Result<Value> {
         match other.unbox_const(){
             RefConstValue::Bool(right) => Ok(Value::Bool(*self == *right)),
@@ -73,24 +79,28 @@ impl BinaryOp<"op_eq"> for Bool{
 }
 
 impl BinaryOp<"op_lt"> for Bool{
+    #[inline(always)]
     fn op_call(&self, other: &RegType) -> Result<Value> {
         Err(UnsupportedOp::new("op_lt").into())
     }
 }
 
 impl BinaryOp<"op_gt"> for Bool{
+    #[inline(always)]
     fn op_call(&self, other: &RegType) -> Result<Value> {
         Err(UnsupportedOp::new("op_gt").into())
     }
 }
 
 impl BinaryOp<"op_le"> for Bool{
+    #[inline(always)]
     fn op_call(&self, other: &RegType) -> Result<Value> {
         Err(UnsupportedOp::new("op_le").into())
     }
 }
 
 impl BinaryOp<"op_ge"> for Bool{
+    #[inline(always)]
     fn op_call(&self, other: &RegType) -> Result<Value> {
         Err(UnsupportedOp::new("op_ge").into())
     }
@@ -113,6 +123,7 @@ impl BinaryOp<"op_mod"> for Bool{}
 impl BinaryOp<"op_fact"> for Bool{}
 
 impl BinaryMutOp<"op_assign"> for Bool {
+    #[inline(always)]
     fn op_call(&mut self, other: &RegType) -> Result<Value> {
         match other.unbox_const(){
             RefConstValue::Bool(right) => {
@@ -125,12 +136,14 @@ impl BinaryMutOp<"op_assign"> for Bool {
 }
 
 impl UnaryOp<"op_bit_not"> for Bool {
+    #[inline(always)]
     fn op_call(&self) -> Result<Value> {
         Ok((!*self).into())
     }
 }
 
 impl UnaryOp<"op_not"> for Bool{
+    #[inline(always)]
     fn op_call(&self) -> Result<Value> {
         Ok((!*self).into())
     }
@@ -150,9 +163,11 @@ impl<const MUTABLE:bool> InlineBool<MUTABLE> {
 }
 
 impl<const MUTABLE:bool> RegTy for InlineBool<MUTABLE>{
+    #[inline(always)]
     fn unbox_const(&self) -> RefConstValue {
         self.0.get().into()
     }
+    #[inline(always)]
     fn unbox_mut(&self) -> Result<RefMutValue> {
         if MUTABLE{
             Ok(self.0.get_mut().into())
@@ -163,6 +178,7 @@ impl<const MUTABLE:bool> RegTy for InlineBool<MUTABLE>{
 }
 
 impl Val for Bool{
+    #[inline(always)]
     fn load_variable(&self, mutable: bool) -> RegType {
         if mutable{
             RegType::InlineBool(InlineBool::new(*self))

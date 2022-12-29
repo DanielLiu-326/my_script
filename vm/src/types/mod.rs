@@ -169,35 +169,6 @@ impl RegType{
     }
 }
 
-// #[inline(always)]
-// pub fn call_bin<const OP_NAME:&'static str>(left:&RegType,right:&RegType) -> Result<Value> {
-//     ref_const_value_match!(left.unbox_const(),left,{
-//         BinaryOp::<OP_NAME>::op_call(left,right)
-//     })
-// }
-//
-// #[inline(always)]
-// pub fn call_unary<const OP_NAME:&'static str>(val:&RegType) -> Result<Value> {
-//     ref_const_value_match!(val.unbox_const(),val,{
-//         UnaryOp::<OP_NAME>::op_call(val)
-//     })
-// }
-//
-// #[inline(always)]
-// pub fn call_mut_bin<const OP_NAME:&'static str>(val:&RegType) -> Result<Value> {
-//     ref_mut_value_match!(val.unbox_mut()?,val,{
-//         UnaryOp::<OP_NAME>::op_call(val)
-//     })
-// }
-//
-// #[inline(always)]
-// pub fn call_mut_unary<const OP_NAME:&'static str>(left:&RegType,right:&RegType) -> Result<Value>{
-//     ref_mut_value_match!(left.unbox_mut()?,left,{
-//         UnaryOp::<OP_NAME>::op_call(left,right)
-//     })
-// }
-
-
 pub(crate) macro call_bin($op_name:literal,$left:expr,$right:expr) {
     ref_const_value_match!(($left).unbox_const(),left,{
         BinaryOp::<$op_name>::op_call(left,$right)
