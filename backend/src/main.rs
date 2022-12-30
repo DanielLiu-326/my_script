@@ -14,10 +14,35 @@ use crate::errors::{DoubleDefine, Error, ScopeOverSize};
 
 static mut IDENT_SCOPE_STACK:Vec<HashSet<String>> = Default::default();
 
-/// Scope:
+pub struct VM{
+    alloc:AllocStack,
+}
+
+pub struct AllocStack{
+    stack:VecDeque<Frame>
+}
+
+pub enum FrameType{
+    Capture,
+    Inherit,
+}
+
+pub struct Frame{
+    frame_type:FrameType,
+    imported  :HashMap<String,usize>,
+    allocated :HashMap<String,usize>,
+    alloc_id  :usize,
+}
+
+impl Frame{
+
+}
 
 
 
+/// scope:
+///     captured_variable
+///     inherited
 
 pub fn compile_(expr:Expr) {
 
