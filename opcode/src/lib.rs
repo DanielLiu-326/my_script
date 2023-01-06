@@ -1,6 +1,6 @@
-type OpReg             = u8;    //寄存器编号类型
-type ConstAddr         = u16;   //常量指针类型
-type RelativeAddr      = u16;   //相对地址类型
+pub type OpReg             = u8;    //寄存器编号类型
+pub type ConstAddr         = u16;   //常量指针类型
+pub type RelativeAddr      = u16;   //相对地址类型
 pub struct SegAddr(u8,u8,u8);   //代码段指针类型
 
 #[repr(u8)]

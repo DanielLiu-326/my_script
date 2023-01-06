@@ -8,8 +8,8 @@
       <sourceFolder url="file://$MODULE_DIR$/backend/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/util/linked_list/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/ast/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/vm/macros/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/opcode/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/util/macros/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/vm/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/vm/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/vm/src" isTestSource="false" />
@@ -20,18 +20,18 @@
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/frontend/target" />
       <excludeFolder url="file://$MODULE_DIR$/backend/target" />
-      <excludeFolder url="file://$MODULE_DIR$/target" />
-      <excludeFolder url="file://$MODULE_DIR$/target" />
-      <excludeFolder url="file://$MODULE_DIR$/backend/target" />
       <excludeFolder url="file://$MODULE_DIR$/backend/vm/target" />
-      <excludeFolder url="file://$MODULE_DIR$/target" />
-      <excludeFolder url="file://$MODULE_DIR$/backend/target" />
-      <excludeFolder url="file://$MODULE_DIR$/backend/vm/target" />
-      <excludeFolder url="file://$MODULE_DIR$/vm/target" />
-      <excludeFolder url="file://$MODULE_DIR$/util/linked_list/target" />
-      <excludeFolder url="file://$MODULE_DIR$/ast/target" />
-      <excludeFolder url="file://$MODULE_DIR$/vm/macros/target" />
       <excludeFolder url="file://$MODULE_DIR$/opcode/target" />
+      <excludeFolder url="file://$MODULE_DIR$/target" />
+      <excludeFolder url="file://$MODULE_DIR$/target" />
+      <excludeFolder url="file://$MODULE_DIR$/util/linked_list/target" />
+      <excludeFolder url="file://$MODULE_DIR$/target" />
+      <excludeFolder url="file://$MODULE_DIR$/backend/target" />
+      <excludeFolder url="file://$MODULE_DIR$/vm/target" />
+      <excludeFolder url="file://$MODULE_DIR$/ast/target" />
+      <excludeFolder url="file://$MODULE_DIR$/backend/vm/target" />
+      <excludeFolder url="file://$MODULE_DIR$/util/macros/target" />
+      <excludeFolder url="file://$MODULE_DIR$/backend/target" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

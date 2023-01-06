@@ -7,3 +7,5 @@ edition = "2021"
 
 [dependencies]
 ast = {path = "../ast"}
+opcode={path="../opcode"}
+macros={path="../util/macros"}

@@ -14,5 +14,5 @@ strip=true
 
 
 [dependencies]
-macros = {path = "./macros" }
+macros = {path = "../util/macros" }
 paste = "*"
