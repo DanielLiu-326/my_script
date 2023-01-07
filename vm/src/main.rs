@@ -66,7 +66,6 @@ use crate::vm::VM;
 
 
 
-mod opcode;
 mod errors;
 mod mem_collection;
 mod util;
@@ -75,7 +74,7 @@ mod stack;
 mod const_table;
 mod types;
 
-
+use opcode::*;
 use crate::types::Value;
 
 fn main() {

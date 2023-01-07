@@ -6,7 +6,6 @@ pub type ConstAddr = u16;
 pub struct ConstTable{
     consts:Vec<Value>,
 }
-
 impl ConstTable{
     pub fn new(consts:Vec<Value>)->Self{
         Self{consts}

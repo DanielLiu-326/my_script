@@ -16,3 +16,4 @@ strip=true
 [dependencies]
 macros = {path = "../util/macros" }
 paste = "*"
+opcode = {path = "../opcode"}
