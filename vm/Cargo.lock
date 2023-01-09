@@ -22,6 +22,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "opcode"
+version = "0.1.0"
+
+[[package]]
 name = "paste"
 version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -73,5 +77,6 @@ name = "vm"
 version = "0.1.0"
 dependencies = [
  "macros",
+ "opcode",
  "paste",
 ]

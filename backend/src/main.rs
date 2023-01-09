@@ -5,8 +5,7 @@ extern crate core;
 mod errors;
 mod limit;
 mod reg_alloc;
-mod mir;
-mod compiler1;
+mod compiler;
 
 use errors::Result;
 use std::alloc::alloc;

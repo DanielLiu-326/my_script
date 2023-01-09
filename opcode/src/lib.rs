@@ -1,8 +1,9 @@
-pub type OpReg             = u8;    //寄存器编号类型
-pub type ConstAddr         = u16;   //常量指针类型
-pub type RelativeAddr      = u16;   //相对地址类型
+type OpReg             = u8;    //寄存器编号类型
+type ConstAddr         = u16;   //常量指针类型
+type RelativeAddr      = u16;   //相对地址类型
 pub struct SegAddr(u8,u8,u8);   //代码段指针类型
 
+#[derive(Debug)]
 #[repr(u8)]
 pub enum OpCode {
     /// 运算指令(结果,左操作数,右操作数)
@@ -52,7 +53,7 @@ pub enum OpCode {
 
 
     /// Load constant from constant table
-    LoadAsConst(OpReg, ConstAddr),
+    // LoadAsConst(OpReg, ConstAddr),
     // LoadConst1(OpReg, ConstAddr), //从常量区1加载数据
     // LoadConst2(OpReg, ConstAddr), //从常量区2加载数据
     // LoadConst3(OpReg, ConstAddr), //从常量区3加载数据
@@ -66,13 +67,13 @@ pub enum OpCode {
     // LoadFromConst3(OpReg,ConstAddr),    //从常量区3加载数据
 
 
-    //创建内嵌式Bool
-    LoadTrue(OpReg),
-    LoadFalse(OpReg),
-
-    //创建内嵌式整数 -65535~65535
-    LoadPosShort(OpReg,u16),
-    LoadNegShort(OpReg,u16),
+    // //创建内嵌式Bool
+    // LoadTrue(OpReg),
+    // LoadFalse(OpReg),
+    //
+    // //创建内嵌式整数 -65535~65535
+    // LoadPosShort(OpReg,u16),
+    // LoadNegShort(OpReg,u16),
 
     // //创建数组 postponed
     // LoadNewArray(OpReg,u16),	    //存储寄存器，初始大小
@@ -84,27 +85,21 @@ pub enum OpCode {
     // //创建闭包，添加捕获变量 postponed
     // CapValue(OpReg,OpReg,OpReg),
 
-    //创建Nil
-    LoadNil(OpReg),
+    // //创建Nil
+    // LoadNil(OpReg),
 
-    //相对跳跃，一次最多跳524280条指令,一个段最多有6553500条指令,最多有6553500个段
-    JmpIfPrev0(OpReg,u16),
-    JmpIfPrev1(OpReg,u16),
-    JmpIfPrev2(OpReg,u16),
-    JmpIfPrev3(OpReg,u16),
-
-    JmpIfPost0(OpReg,u16),
-    JmpIfPost1(OpReg,u16),
-    JmpIfPost2(OpReg,u16),
-    JmpIfPost3(OpReg,u16),
-
+    //相对跳跃
+    JmpPrev(u8,u8,u8),
+    JmpPost(u8,u8,u8),
+    //判断是否为True，如果为True则跳过下一行代码，如果为False则执行下一行代码
+    Chk(u8),
 
     ///函数调用
     /// - 压入PC寄存器
     /// - 压入基地址寄存器
     /// - 将基地址设置为栈顶-4
     Call(u8),
-    CallConst0(ConstAddr),      //调用Const函数
+    // CallConst0(ConstAddr),      //调用Const函数
 
     Ret,                        //弹出到基地址寄存器，弹出到程序计数
 
@@ -120,12 +115,11 @@ impl Copy for OpCode{}
 
 
 impl OpCode{
+
     #[inline(always)]
-    pub fn get_u24(&self) ->u32 {
-        unsafe {
-            *(self as *const Self).cast::<u32>() & 0x00_ff_ff_ff
-        }
-    }
+    pub fn get_u24(&self) ->u32 { unsafe {
+        *(self as *const Self).cast::<u32>() & 0x00_ff_ff_ff
+    }}
 
     #[inline(always)]
     pub fn get_uncut(&self) ->u32 {
@@ -135,9 +129,7 @@ impl OpCode{
     }
 
     #[inline(always)]
-    pub fn set_u24(&mut self,val:u32){
-        unsafe{
-            *(self as *mut Self).cast::<u32>() |= val;
-        }
-    }
+    pub fn set_u24(&mut self,val:u32){unsafe{
+        *(self as *mut Self).cast::<u32>() |= val;
+    }}
 }
