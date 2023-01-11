@@ -17,3 +17,4 @@ strip=true
 macros = {path = "../util/macros" }
 paste = "*"
 opcode = {path = "../opcode"}
+concept ={path = "../concept"}

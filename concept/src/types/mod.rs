@@ -6,7 +6,6 @@ pub mod errors;
 
 use std::collections::hash_map::Values;
 use macros::mux;
-use paste::paste;
 
 pub use integer::*;
 pub use float::*;
@@ -98,7 +97,7 @@ pub enum RefMutValue<'a>{
 impl Value {
     #[inline(always)]
     pub fn load_variable(&self,mutable:bool) -> RegType{
-        value_match!(self,val,{
+        value_match!(self => val,{
             val.load_variable(mutable)
         })
     }
@@ -118,14 +117,22 @@ impl<'a> RefConstValue<'a>{
     }
 }
 
+pub(crate) macro call_bin_mut($op_name:literal,$left:expr,$right:expr) {{
+    let right = $right.unbox_const();
+    ref_mut_value_match!(($left).unbox_mut() => left,{
+        BinaryOp::<$op_name>::op_call(left,right)
+    })
+}}
+
 pub(crate) macro call_bin($op_name:literal,$left:expr,$right:expr) {
-    ref_const_value_match!(($left).unbox_const(),left,{
-        BinaryOp::<$op_name>::op_call(left,$right)
+    let right = $right.unbox_const();
+    ref_const_value_match!(($left).unbox_const() => left,{
+        BinaryOp::<$op_name>::op_call(left,right)
     })
 }
 
 pub(crate) macro call_unary($op_name:literal,$value:expr) {
-    ref_const_value_match!(($value).unbox_const(),value,{
+    ref_const_value_match!(($value).unbox_const() => value,{
         UnaryOp::<$op_name>::op_call(value)
     })
 }

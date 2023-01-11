@@ -34,7 +34,7 @@ pub fn mux(_attr:TokenStream,mut input:TokenStream) -> TokenStream{
     let mut output:proc_macro2::TokenStream = input.into();
 
     output.extend(quote!(
-        pub(crate) macro #macro_name($input:expr,$var:ident,$output:expr){{
+        pub(crate) macro #macro_name($input:expr => $var:ident,$output:expr){{
             use #enum_ty :: *;
             match $input{
                 #(#vars ($var) => {
