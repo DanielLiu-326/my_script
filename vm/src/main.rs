@@ -3,7 +3,7 @@
 #![feature(adt_const_params)]
 #![feature(decl_macro)]
 //
-use crate::opcode::OpCode;
+use concept::opcode::OpCode;
 use crate::stack::VmStack;
 use crate::vm::VM;
 
@@ -72,10 +72,10 @@ mod util;
 mod vm;
 mod stack;
 mod const_table;
-mod types;
+mod register_type;
 
-use opcode::*;
-use crate::types::Value;
+use concept::opcode::*;
+use concept::types::Value;
 
 fn main() {
 

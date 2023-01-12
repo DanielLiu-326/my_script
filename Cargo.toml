@@ -6,6 +6,6 @@ edition = "2021"
 
 [dependencies]
 peg = "*"
-ast = {path="./ast"}
+concept={path="../concept"}
 frontend ={path = "./frontend"}
 backend ={path = "./backend"}

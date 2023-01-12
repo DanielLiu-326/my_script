@@ -183,9 +183,9 @@ impl BinaryOp<"op_fact"> for Float{
 
 impl BinaryMutOp<"op_assign"> for Float {
     #[inline(always)]
-    fn op_call(&mut self, other:RefConstValue) -> Result<Value> {
+    fn op_call(&mut self, other:RefMutValue) -> Result<Value> {
         match other{
-            RefConstValue::Float(right) => {
+            RefMutValue::Float(right) => {
                 *self = *right;
                 Ok((*self).into())
             },

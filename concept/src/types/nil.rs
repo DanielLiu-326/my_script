@@ -1,5 +1,7 @@
 use super::errors::*;
 use crate::types::{BinaryMutOp, BinaryOp, RefMutValue, UnaryOp};
+use utilities::UncheckMut;
+use crate::types::Val;
 
 #[derive(Debug)]
 pub struct Nil;
@@ -52,40 +54,6 @@ impl UnaryOp<"op_neg"> for Nil {}
 
 impl UnaryOp<"op_pos"> for Nil {}
 
-// reg types
-pub struct RefNil<const MUTABLE:bool>(UncheckMut<Nil>);
-
-impl<const MUTABLE:bool> RefNil<MUTABLE> {
-    #[inline(always)]
-    pub fn new()->Self{
-        Self(UncheckMut::new(Nil))
-    }
-}
-
-impl<const MUTABLE:bool> RegTy for RefNil<MUTABLE>{
-    #[inline(always)]
-    fn unbox_const(&self) -> RefConstValue {
-        self.0.get().into()
-    }
-    #[inline(always)]
-    fn unbox_mut(&self) -> Result<RefMutValue> {
-        if MUTABLE{
-            Ok(self.0.get_mut().into())
-        } else {
-            Err(MutabilityError::new().into())
-        }
-    }
-}
-
-impl Val for Nil{
-    #[inline(always)]
-    fn load_variable(&self, mutable: bool) -> RegType {
-        if mutable{
-            RegType::RefNil(RefNil::new())
-        }else{
-            RegType::ConstRefNil(RefNil::new())
-        }
-    }
-}
+impl Val for Nil{}
 
 

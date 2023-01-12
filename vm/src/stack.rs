@@ -1,5 +1,6 @@
 use std::fmt::{Debug, format, Formatter};
-use crate::types::{RefNil, RegTy, RegType, Value};
+use concept::types::{Value};
+
 use crate::util::UncheckMut;
 
 pub struct VmStack{

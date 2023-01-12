@@ -9,27 +9,27 @@ use macros::mux;
 
 pub use integer::*;
 pub use float::*;
-pub use bool::*;
+pub use self::bool::*;
 pub use nil::*;
 pub use errors::*;
 
 // ***************** operation defines *****************
 
-pub trait BinaryOp<const OP_NAME:&'static str>{
+pub trait BinaryOp<const OP_NAME:&'static str> {
     #[inline(always)]
     fn op_call(&self,other:RefConstValue) ->Result<Value>{
         Err(UnsupportedOp::new(OP_NAME).into())
     }
 }
 
-pub trait BinaryMutOp<const OP_NAME:&'static str>{
+pub trait BinaryMutOp<const OP_NAME:&'static str> {
     #[inline(always)]
-    fn op_call(&mut self,other:RefMutValue) ->Result<Value>{
+    fn op_call(&mut self,other:RefMutValue) ->Result<Value> {
         Err(UnsupportedOp::new(OP_NAME).into())
     }
 }
 
-pub trait UnaryOp<const OP_NAME:&'static str>{
+pub trait UnaryOp<const OP_NAME:&'static str> {
     #[inline(always)]
     fn op_call(&self) ->Result<Value>{
         Err(UnsupportedOp::new(OP_NAME).into())
@@ -63,9 +63,7 @@ pub trait Val:
     UnaryOp<"op_not">+
     UnaryOp<"op_neg">+
     UnaryOp<"op_pos">
-{
-    fn load_variable(&self,mutable:bool) -> RegType;
-}
+{}
 
 #[mux]
 #[derive(Debug)]
@@ -94,45 +92,5 @@ pub enum RefMutValue<'a>{
     Nil     (&'a mut Nil),
 }
 
-impl Value {
-    #[inline(always)]
-    pub fn load_variable(&self,mutable:bool) -> RegType{
-        value_match!(self => val,{
-            val.load_variable(mutable)
-        })
-    }
-}
+impl Value {}
 
-impl<'a> RefConstValue<'a>{
-    #[inline(always)]
-    pub fn try_into_bool(&self)->Result<&bool>{
-        match self{
-            RefConstValue::Bool(ret) => {
-                Ok(ret)
-            },
-            _ => {
-                Err(TypeError::new("Bool","...").into())
-            },
-        }
-    }
-}
-
-pub(crate) macro call_bin_mut($op_name:literal,$left:expr,$right:expr) {{
-    let right = $right.unbox_const();
-    ref_mut_value_match!(($left).unbox_mut() => left,{
-        BinaryOp::<$op_name>::op_call(left,right)
-    })
-}}
-
-pub(crate) macro call_bin($op_name:literal,$left:expr,$right:expr) {
-    let right = $right.unbox_const();
-    ref_const_value_match!(($left).unbox_const() => left,{
-        BinaryOp::<$op_name>::op_call(left,right)
-    })
-}
-
-pub(crate) macro call_unary($op_name:literal,$value:expr) {
-    ref_const_value_match!(($value).unbox_const() => value,{
-        UnaryOp::<$op_name>::op_call(value)
-    })
-}

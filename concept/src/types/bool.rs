@@ -126,7 +126,7 @@ impl BinaryMutOp<"op_assign"> for Bool {
     #[inline(always)]
     fn op_call(&mut self, other: RefMutValue) -> Result<Value> {
         match other{
-            RefConstValue::Bool(right) => {
+            RefMutValue::Bool(right) => {
                 *self = *right;
                 Ok((*self).into())
             },

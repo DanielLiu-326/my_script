@@ -1,11 +1,14 @@
 use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
 use crate::const_table::ConstTable;
-use crate::opcode::OpCode;
 use crate::stack::VmStack;
-use crate::types::*;
+
+use concept::opcode::OpCode;
+use concept::types::*;
 
 use crate::errors::*;
+use crate::register_type::{call_bin, call_unary};
+
 pub struct VM {
     stack:VmStack,
     pc:usize,

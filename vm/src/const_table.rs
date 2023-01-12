@@ -1,4 +1,4 @@
-use crate::types::{RegType, Value};
+use concept::types::{ Value};
 
 pub type ConstAddr = u16;
 

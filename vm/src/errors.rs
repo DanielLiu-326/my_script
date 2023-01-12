@@ -1,4 +1,4 @@
-use concept::types::error::*;
+use concept::types::errors::*;
 use std::fmt::{Debug, Display, Formatter};
 use macros::mux;
 

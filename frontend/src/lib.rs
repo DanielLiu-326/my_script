@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::str::FromStr;
-use ast;
+use concepts::ast;
 pub use my_parser::*;
 
 peg::parser!{ grammar my_parser() for str{
